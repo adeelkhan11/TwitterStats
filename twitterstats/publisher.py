@@ -16,6 +16,5 @@ class Publisher:
         print(values)
         data = urllib.parse.urlencode(values).encode('utf-8')
         response = urllib.request.urlopen(url, data)
-        # response = urllib2.urlopen(req)
         the_page = response.read()
         print(the_page)
