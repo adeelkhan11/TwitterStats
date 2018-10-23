@@ -1,21 +1,114 @@
+import datetime
 import logging
 import sqlite3
-from twitterstats.dbutil import DBUtil, PublishTweet
+from dataclasses import dataclass, field
+from typing import List
+from twitterstats.dbutil import DBUtil
+from twitterstats import secommon
+# from twitterstats.singleton import Singleton
+from twitterstats.secommon import now
+from twitterstats.urdu import urdu_to_english
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class NameScore:
+    status_count: int = 0
+    total_score: int = 0
+
+
+@dataclass
+class Range:
+    min_id: int
+    max_id: int
+    processed: bool = False
+
+
+@dataclass
+class Hashtag:
+    name: str
+    ranges: List[Range] = field(default_factory=list)
+    name_scores: List[NameScore] = field(default_factory=list)
+    _state: str = ''
+
+    def __post_init__(self):
+        self.name_scores.append(NameScore())
+        self.state = 'AUTO_DEL'
+
+    def get_average_score(self, sample_size):
+        total_score = sum([ns.total_score for ns in self.name_scores[-sample_size:]])
+        total_count = sum([ns.status_count for ns in self.name_scores[-sample_size:]])
+
+        result = 0 if total_count == 0 else total_score / total_count
+        return result
+
+    def get_status_count(self, sample_size):
+        return sum([ns.status_count for ns in self.name_scores[-sample_size:]])
+
+    @property
+    def state(self) -> str:
+        if self._state == '':
+            state = DB.db.get_trends().get(self.name, None)
+            if state is None:
+                state = 'AUTO_DEL'
+                DB.db.set_trend(self.name, state)
+                DB.db.get_trends()[self.name] = state
+            self._state = state
+
+        return self._state
+
+    @state.setter
+    def state(self, v: str):
+        if v != self.state:
+            self._state = v
+            DB.db.set_trend(self.name, v)
+            DB.db.get_trends()[self.name] = v
+
+
+# @dataclass_json
+@dataclass
+class Tweet:
+    id: int
+    created_at: str
+    screen_name: str
+    text: str
+    retweet_count: int
+    category: str
+
+
+@dataclass
+class PublishTweet(Tweet):
+    score: float
+    bot_data_availability: bool
+    rank: int = None
+    drafted_date: str = None
+    account: str = None
+
+    def publish_dict(self):
+        return {'tweet_id': str(self.id), 'type': 'retweet', 'tweeter_type': self.category,
+                'tweet_created_at': self.created_at,
+                'tweet_retweet_count': self.retweet_count,
+                'bot_score': '{}/{}'.format(self.score, self.bot_data_availability), 'rank': self.rank,
+                'tweet_screen_name': self.screen_name, 'head': self.text, 'drafted_at': self.drafted_date,
+                'account': self.account}
+
+
 class DB(DBUtil):
+    db = None
+
     def __init__(self, environment, date):
         DBUtil.__init__(self, environment)
-        self.tokens = []
-        self.curr_token_index = -1
-        self.default_token_index = -1
+        if DB.db is None:
+            DB.db = self
+        else:
+            raise Exception("DB instantiated twice.")
 
         self.fact_status = dict()
         self.tag_history = list()
         self.date_skey_cache = dict()
         self.fact_status_retweet_count = dict()
+        self._tag_discovery = dict()
         self.name_scores = None
         self.category_scores = None
         self.timezone_scores = None
@@ -25,6 +118,18 @@ class DB(DBUtil):
         self.min_date = None
         self.range_min = None
         self.range_max = None
+
+        self.date_skey_request = 0
+        self.date_skey_dblookup = 0
+        self.word_skey_request = 0
+        self.word_skey_dblookup = 0
+        self.tweeter_skey_request = 0
+        self.tweeter_skey_dblookup = 0
+        self.date_skey_cache = {}
+        self.word_skey_cache = {}
+        self.tweeter_skey_cache = {}
+
+        self.rated_tweeters = {}
 
         self.connect(date)
 
@@ -58,7 +163,8 @@ class DB(DBUtil):
     def get_top_tweets(self, start_date, end_date):
         t = (start_date, end_date, self.env.cutoff_a[0], 'A', self.env.cutoff_b[0], 'G', self.env.cutoff_default[0])
         sql = """select t.id, t.created_at, t.screen_name,
-        t.text, t.retweet_count, dt.category, t.retweet_count + (bot.bot_factor * 2) as score, bot.bot_data_availability from (
+        t.text, t.retweet_count, dt.category, t.retweet_count + (bot.bot_factor * 2) as score, bot.bot_data_availability
+        from (
         select count(*) tweet_count, sum(IfNull(bot_score, 4) - 4) as bot_factor,
         sum(case when bot_score is null then 0 else 1 end) bot_data_availability, max(t.retweet_count) retweet_count,
         retweet_id, t.retweet_screen_name, t.text
@@ -83,3 +189,469 @@ class DB(DBUtil):
 
         tweets = [PublishTweet(*row) for row in rows]
         return tweets
+
+    def get_next_batch_id(self):
+        batch_id = 1
+        self.c.execute('SELECT max(batch_id) max_id FROM fact_status')
+        row = self.c.fetchone()
+        if row is not None and row[0] is not None:
+            batch_id = row[0] + 1
+
+        logger.info('Batch {}'.format(batch_id))
+        return batch_id
+
+    def get_baseline_tweet_id(self):
+        self.c.execute('SELECT min_tweet_id FROM db_baseline')
+        row = self.c.fetchone()
+        return row[0]
+
+    def get_famous_screen_names(self):
+        self.c.execute('select screen_name from dim_tweeter where category < ?', ('C',))
+        rows = self.c.fetchall()
+        return [row[0] for row in rows]
+
+    def get_next_read_sequence(self):
+        self.c.execute('select max(ifnull(read_sequence, 0)) from dim_tweeter')
+        row = self.c.fetchone()
+        return int(row[0]) + 1
+
+    def set_read_sequence(self, screen_name, read_sequence):
+        t = (read_sequence, screen_name)
+        self.c.execute('update dim_tweeter set read_sequence = ? where screen_name = ?', t)
+
+    def set_tweeter_error(self, screen_name, error):
+        t = (error, screen_name)
+        self.c.execute('update dim_tweeter set error = ? where screen_name = ?', t)
+
+    def get_next_screen_names_for_category(self, category, limit):
+        t = (category + '%', limit)
+        self.c.execute(
+            """select screen_name
+            from dim_tweeter
+            where category like ? and error is null order by ifnull(read_sequence, 0) limit ?""",
+            t)
+        return [row[0] for row in self.c.fetchall()]
+
+    def delete_batch(self, batch_id):
+        t = (batch_id,)
+        self.c.execute('delete from fact_status where batch_id = ?', t)
+
+    def write_tweets(self):
+        counter = 0
+        for key, item in self.fact_status.items():
+            # mark_database_activity()
+            self.c.execute("""
+                insert into fact_status
+                 (id, created_at, screen_name, text, tweeter_skey, retweet_count, in_reply_to_status_id, date_skey,
+                  retweet_id, retweet_created_at, retweet_screen_name, batch_id, english_words)
+                values (?,?,?,?,?,?,?,?,?,?,?,?,?)""", item)
+            counter += 1
+        logger.info("%i tweets written." % counter)
+        self.fact_status = dict()
+
+    def update_max_id(self, hashtag, _id, min_id):
+        raise(Exception("Update max id was called."))
+        if _id > 0:
+            self.tag_history.append([hashtag, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), _id, min_id])
+
+    def get_list_max_id(self, list_name):
+        self.c.execute('select max(max_id) from tag_history where tag = ?', (list_name, ))
+        row = self.c.fetchone()
+        return row[0]
+
+    def write_list_max_id(self, list_name, max_id, min_id):
+        t = (list_name, now(), max_id, min_id)
+        self.c.execute('insert into tag_history (tag, date, max_id, min_id) values (?,?,?,?)', t)
+
+    def write_tag_history(self):
+        counter = 0
+        for trend in self.tag_history:
+            for id_range in trend.ranges:
+                # mark_database_activity()
+                if id_range.max_id is not None and id_range.processed:
+                    t = (trend.name, now(), id_range.max_id, id_range.min_id)
+                    self.c.execute('insert into tag_history (tag, date, max_id, min_id) values (?,?,?,?)', t)
+                    # print "tag_history: %25s,%20s,%20d,%20d" % item
+                    counter += 1
+        logger.info("%i tag histories written." % counter)
+        self.tag_history = list()
+
+    def get_name_score(self, name, screen_name, location='', timezone=''):
+        if self.name_scores is None:
+            self.load_name_score_data()
+
+        location = self.none_to_empty(location)
+        timezone = self.none_to_empty(timezone)
+        category = self.sn_categories[screen_name] if screen_name in self.sn_categories else ''
+
+        name_score = self.calculate_text_score(name, self.name_scores)
+        category_score = self.calculate_text_score(category, self.category_scores)
+        location_score = self.calculate_text_score(location, self.location_scores)
+        timezone_score = self.calculate_text_score(timezone, self.timezone_scores)
+
+        logger.debug("Name:%3d   Category:%3d   Location:%3d   Timezone:%3d  %-20s %s %-15s %-15s" % (
+            name_score, category_score, location_score, timezone_score, name[:20], category, location[:15],
+            timezone[:15]))
+
+        return category_score + min(10, max(-5, name_score + location_score + timezone_score))
+
+    def get_tag_ranges(self, tag, min_override):
+        # tag is a word with preceding hash
+        result = Hashtag(name=tag)
+
+        t = (tag.lower(),)
+        self.c.execute('SELECT min_id, max_id FROM tag_history WHERE tag=? order by max_id desc', t)
+        row = self.c.fetchone()
+        prev_min = None
+        # print "Min Override: %20d,%20d,%20d" % (min_override, row[0], row[1])
+        while row is not None and row[0] is not None:
+            (min_id, max_id) = row
+            if max_id >= min_override:
+                if len(result.ranges) == 0:
+                    result.ranges.append(Range(min_id=max_id, max_id=None))
+                elif max_id < prev_min:
+                    result.ranges.append(Range(min_id=max_id, max_id=prev_min))
+            else:
+                if len(result.ranges) == 0:
+                    result.ranges.append(Range(min_id=min_override, max_id=None))
+                elif max_id < prev_min and min_override < prev_min:
+                    result.ranges.append(Range(min_id=min_override, max_id=prev_min))
+
+            prev_min = min_id
+            row = self.c.fetchone()
+
+        if prev_min is None or prev_min > min_override:
+            result.ranges.append(Range(min_id=min_override, max_id=prev_min))
+
+        return result
+
+    def get_tag_completeness(self, tag):
+        if self.range_min is None:
+            # Get the min and max id ranges for the day
+            sql = """select b.min_date, min(id), max(id)
+            from fact_status s join db_baseline b
+            on substr(s.created_at, 1, 10) = b.min_date"""
+            self.c.execute(sql)
+            self.min_date, self.range_min, self.range_max = self.c.fetchone()
+
+        hashtag = self.get_tag_ranges(tag, self.range_min)
+        total_gap = 0
+        # print tag
+        for r in hashtag.ranges:
+            min_id = r.min_id
+            if min_id < self.range_max:
+                max_id = r.max_id if r.max_id is not None else self.range_max
+                total_gap += max_id - min_id
+
+        # print total_gap, max_id, min_id
+        return round(1.0 - (float(total_gap) / float(self.range_max - self.range_min)), 3)
+
+    # def update_tweet_words(self, id, english_words):
+    #     self.fact_status[id][12] = english_words
+
+    def update_tweet_words(self, _id, english_words):
+        self.fact_status[_id][12] = english_words
+
+    def get_trends(self):
+        if len(self._tag_discovery) == 0:
+            self.c.execute('select tag, result from tag_discovery order by discovery_time')
+            row = self.c.fetchone()
+            while row is not None:
+                self._tag_discovery[row[0].lower()] = row[1]
+                row = self.c.fetchone()
+
+            logger.info("Fetched trends: %s" % self._tag_discovery)
+
+        return self._tag_discovery
+
+    def get_trend_discovery_times(self):
+        result = {}
+        self.c.execute('select tag, max(discovery_time) from tag_discovery group by tag')
+        row = self.c.fetchone()
+        while row is not None:
+            result[row[0].lower()] = row[1]
+            row = self.c.fetchone()
+
+        return result
+
+    def set_trend(self, trend, result):
+        t = (trend, now())
+        self.c.execute('DELETE FROM tag_discovery WHERE tag = ? AND discovery_time = ?', t)
+        t = (trend, result, now())
+        self.c.execute('INSERT INTO tag_discovery (tag, result, discovery_time) VALUES (?, ?, ?)', t)
+
+    def load_name_score_data(self):
+        if self.name_scores is None:
+            self.name_scores = secommon.read_csv_hash('metadata/name_score.csv', removeZero=True)
+            self.category_scores = secommon.read_csv_hash('metadata/category_score.csv', removeZero=True)
+            self.timezone_scores = secommon.read_csv_hash('metadata/timezone_score.csv', removeZero=True)
+            self.location_scores = secommon.read_csv_hash('metadata/location_score.csv', removeZero=True)
+
+            sql = """select screen_name, category
+                from dim_tweeter
+                where category is not null"""
+            self.c.execute(sql)
+            rows = self.c.fetchall()
+            self.sn_categories = dict()
+            for (screen_name, category) in rows:
+                self.sn_categories[screen_name] = category
+
+    def get_date_skey(self, date):
+        if date not in self.date_skey_cache:
+            # mark_database_activity()
+            t = (date,)
+            self.c.execute('select date_skey from dim_date where date = ?', t)
+            row = self.c.fetchone()
+            if row is None:
+                self.c.execute('insert into dim_date (date) values (?)', t)
+                self.c.execute('select date_skey from dim_date where date = ?', t)
+                row = self.c.fetchone()
+            self.date_skey_cache[date] = row[0]
+
+        return self.date_skey_cache[date]
+
+    def tweet_is_duplicate(self, id_, created_at, screen_name, text, tweeter_skey, retweet_count, in_reply_to_status_id,
+                           date_skey, retweet_id, retweet_created_at, retweet_screen_name, batch_id):
+        result = 1
+        if id_ not in self.fact_status and id_ not in self.fact_status_retweet_count:
+            t = (id_,)
+            self.c.execute('select id, retweet_count from fact_status where id = ?', t)
+            row = self.c.fetchone()
+            if row is None:
+                self.fact_status[id_] = [id_, created_at, screen_name, text, tweeter_skey, retweet_count,
+                                         in_reply_to_status_id, date_skey, retweet_id, retweet_created_at,
+                                         retweet_screen_name, batch_id, '']
+                result = 0
+            elif retweet_count != row[1]:
+                self.fact_status_retweet_count[id_] = retweet_count
+                t = (retweet_count, id_)
+                self.c.execute('update fact_status set retweet_count = ? where id = ?', t)
+            elif retweet_count == row[1]:
+                self.fact_status_retweet_count[id_] = retweet_count
+        elif id_ in self.fact_status_retweet_count and retweet_count != self.fact_status_retweet_count[id_]:
+            self.fact_status_retweet_count[id_] = retweet_count
+            t = (retweet_count, id_)
+            self.c.execute('update fact_status set retweet_count = ? where id = ?', t)
+
+        return result
+
+    def get_tweeter_skey(self, screen_name, name='', followers_count=0, friends_count=0, lang='', time_zone='',
+                         verified='', id_=0, statuses_count=0, profile_image_url='', created_at='', location=''):
+        # mark_database_activity()
+        snl = screen_name.lower()
+        if snl not in self.tweeter_skey_cache or (self.tweeter_skey_cache[snl] < 0 and name != ''):
+            # mark_database_activity()
+            t = (snl,)
+            self.c.execute(
+                'select tweeter_skey, name, followers_count, lang, time_zone, verified, statuses_count, category, profile_image_url, friends_count, created_at, location from dim_tweeter where screen_name_lower = ?',
+                t)
+            row = self.c.fetchone()
+            if row is None:
+                if name == '':
+                    t = (snl, screen_name)
+                    self.c.execute('insert into dim_tweeter (screen_name_lower, screen_name) values (?,?)', t)
+                else:
+                    t = (snl, screen_name, name, followers_count, lang, time_zone, verified, statuses_count,
+                         profile_image_url, friends_count, created_at, location)
+                    self.c.execute(
+                        'insert into dim_tweeter (screen_name_lower, screen_name, name, followers_count, lang, time_zone, verified, statuses_count, profile_image_url, friends_count, created_at, location) values (?,?,?,?,?,?,?,?,?,?,?,?)',
+                        t)
+                t = (snl,)
+                self.c.execute('select tweeter_skey from dim_tweeter where screen_name_lower = ?', t)
+                row = self.c.fetchone()
+            elif name != '' and (
+                    row[1] != name or row[2] != followers_count or row[3] != lang or row[4] != time_zone or row[
+                5] != verified or row[6] != statuses_count or row[7] != friends_count or row[8] != created_at or row[
+                        9] != location):  # keep name up to date
+                t = (
+                    screen_name, name, followers_count, lang, time_zone, verified, id_, statuses_count,
+                    profile_image_url,
+                    friends_count, created_at, location, snl)
+                self.c.execute(
+                    'update dim_tweeter set screen_name = ?, name = ?, followers_count = ?, lang = ?, time_zone = ?, verified = ?, id = ?, statuses_count = ?, profile_image_url = ?, friends_count = ?, created_at = ?, location = ? where screen_name_lower = ?',
+                    t)
+
+            self.tweeter_skey_dblookup += 1
+            # X: Banned
+            # R: Robot - confirmed
+            if len(row) > 7 and row[7] is not None and row[7] >= 'X':
+                self.tweeter_skey_cache[snl] = 0
+            else:
+                if name != '':
+                    self.tweeter_skey_cache[snl] = row[0]
+                else:
+                    self.tweeter_skey_cache[snl] = row[0] * -1
+            if len(row) > 7 and row[7] is not None and row[7] < 'C':
+                self.rated_tweeters[snl] = row[7]
+
+        self.tweeter_skey_request += 1
+        return abs(self.tweeter_skey_cache[snl])
+
+    def write_hashtag_word(self, tweetdate, hashtag, word, count):
+        # mark_database_activity()
+        date_skey = self.get_date_skey(tweetdate)
+        (word_skey, english_word) = self.get_word_skey(word, tweetdate)
+        (tag_skey, english_tag) = self.get_word_skey(hashtag, tweetdate)
+        t = (word_skey, tag_skey, date_skey)
+        self.c.execute(
+            'select count from fact_daily_hashtag_word where word_skey = ? and tag_skey = ? and date_skey = ?', t)
+        row = self.c.fetchone()
+        if row is None:
+            t = (word_skey, tag_skey, date_skey, count)
+            self.c.execute(
+                'insert into fact_daily_hashtag_word (word_skey, tag_skey, date_skey, count) values (?,?,?,?)', t)
+        else:
+            total_count = row[0] + count
+            t = (total_count, word_skey, tag_skey, date_skey)
+            self.c.execute(
+                'update fact_daily_hashtag_word set count = ? where word_skey = ? and tag_skey = ? and date_skey = ?',
+                t)
+
+    def write_tweeter_word(self, tweetdate, tweeter, word, count):
+        # mark_database_activity()
+        date_skey = self.get_date_skey(tweetdate)
+        (word_skey, english_word) = self.get_word_skey(word, tweetdate)
+        tweeter_skey = self.get_tweeter_skey(tweeter)
+        t = (word_skey, tweeter_skey, date_skey)
+        self.c.execute(
+            'select count from fact_daily_tweeter_word where word_skey = ? and tweeter_skey = ? and date_skey = ?', t)
+        row = self.c.fetchone()
+        if row == None:
+            t = (word_skey, tweeter_skey, date_skey, count)
+            self.c.execute(
+                'insert into fact_daily_tweeter_word (word_skey, tweeter_skey, date_skey, count) values (?,?,?,?)', t)
+        else:
+            total_count = row[0] + count
+            t = (total_count, word_skey, tweeter_skey, date_skey)
+            self.c.execute(
+                'update fact_daily_tweeter_word set count = ? where word_skey = ? and tweeter_skey = ? and date_skey = ?',
+                t)
+
+    def write_tweeter_mention(self, tweetdate, tweeter, mention, count):
+        # mark_database_activity()
+        date_skey = self.get_date_skey(tweetdate)
+        tweeter_skey = self.get_tweeter_skey(tweeter)
+        mention_skey = self.get_tweeter_skey(mention)
+        t = (mention_skey, tweeter_skey, date_skey)
+        self.c.execute(
+            'select count from fact_daily_tweeter_mention where mentioned_tweeter_skey = ? and tweeter_skey = ? and date_skey = ?',
+            t)
+        row = self.c.fetchone()
+        if row is None:
+            t = (mention_skey, tweeter_skey, date_skey, count)
+            self.c.execute(
+                'insert into fact_daily_tweeter_mention (mentioned_tweeter_skey, tweeter_skey, date_skey, count) values (?,?,?,?)',
+                t)
+        else:
+            total_count = row[0] + count
+            t = (total_count, mention_skey, tweeter_skey, date_skey)
+            self.c.execute(
+                'update fact_daily_tweeter_mention set count = ? where mentioned_tweeter_skey = ? and tweeter_skey = ? and date_skey = ?',
+                t)
+
+    def write_tag(self, tweetdate, tag, count):
+        # mark_database_activity()
+        date_skey = self.get_date_skey(tweetdate)
+        (word_skey, english_word) = self.get_word_skey(tag.lower(), tweetdate)
+        t = (word_skey, date_skey, tag)
+        self.c.execute('select count from fact_daily_hashtag where word_skey = ? and date_skey = ? and hashtag = ?', t)
+        row = self.c.fetchone()
+        if row == None:
+            t = (word_skey, date_skey, tag, count)
+            try:
+                self.c.execute('insert into fact_daily_hashtag (word_skey, date_skey, hashtag, count) values (?,?,?,?)',
+                               t)
+            except sqlite3.IntegrityError:
+                print("Could not save fact_daily_hashtag:", word_skey, date_skey, tag, count)
+                raise
+        else:
+            total_count = row[0] + count
+            t = (total_count, word_skey, date_skey, tag)
+            self.c.execute(
+                'update fact_daily_hashtag set count = ? where word_skey = ? and date_skey = ? and hashtag = ?', t)
+
+    def write_tag_tweeter(self, tweetdate, tag, tweeter, count):
+        # mark_database_activity()
+        date_skey = self.get_date_skey(tweetdate)
+        (tag_skey, english_tag) = self.get_word_skey(tag.lower(), tweetdate)
+        tweeter_skey = self.get_tweeter_skey(tweeter)
+        t = (tag_skey, tweeter_skey, date_skey)
+        self.c.execute(
+            'select count from fact_daily_hashtag_tweeter where tag_skey = ? and tweeter_skey = ? and date_skey = ?', t)
+        row = self.c.fetchone()
+        if row is None:
+            t = (tag_skey, tweeter_skey, date_skey, count)
+            self.c.execute(
+                'insert into fact_daily_hashtag_tweeter (tag_skey, tweeter_skey, date_skey, count) values (?,?,?,?)', t)
+        else:
+            total_count = row[0] + count
+            t = (total_count, tag_skey, tweeter_skey, date_skey)
+            self.c.execute(
+                'update fact_daily_hashtag_tweeter set count = ? where tag_skey = ? and tweeter_skey = ? and date_skey = ?',
+                t)
+
+    def write_tag_tag(self, tweetdate, tag, other_tag, count):
+        # mark_database_activity()
+        date_skey = self.get_date_skey(tweetdate)
+        (tag_skey, english_tag) = self.get_word_skey(tag.lower(), tweetdate)
+        (other_tag_skey, english_other_tag) = self.get_word_skey(other_tag.lower(), tweetdate)
+        t = (other_tag_skey, tag_skey, date_skey)
+        self.c.execute(
+            'select count from fact_daily_hashtag_hashtag where other_tag_skey = ? and tag_skey = ? and date_skey = ?',
+            t)
+        row = self.c.fetchone()
+        if row == None:
+            t = (other_tag_skey, tag_skey, date_skey, count)
+            self.c.execute(
+                'insert into fact_daily_hashtag_hashtag (other_tag_skey, tag_skey, date_skey, count) values (?,?,?,?)',
+                t)
+        else:
+            total_count = row[0] + count
+            t = (total_count, other_tag_skey, tag_skey, date_skey)
+            self.c.execute(
+                'update fact_daily_hashtag_hashtag set count = ? where other_tag_skey = ? and tag_skey = ? and date_skey = ?',
+                t)
+
+    def write_tag_score(self, tag, tweet_count, score, max_id):
+        t = (tag, tweet_count, score, max_id, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        self.c.execute('insert into tag_score (tag, tweet_count, score, max_id, score_time) values (?,?,?,?,?)', t)
+
+    def get_word_skey(self, word, date):
+        # mark_database_activity()
+        if word not in self.word_skey_cache:
+            # mark_database_activity()
+            t = (word,)
+            self.c.execute('select word_skey, english_word from dim_word where word = ?', t)
+            row = self.c.fetchone()
+            if row == None:
+                englishword = urdu_to_english(word)
+                t = (word, englishword, date)
+                self.c.execute('insert into dim_word (word, english_word, created_date) values (?,?,?)', t)
+                t = (word,)
+                self.c.execute('select word_skey, english_word from dim_word where word = ?', t)
+                row = self.c.fetchone()
+            # if the English word isn't stored in the db, then store it
+            if row[1] is None:
+                englishword = urdu_to_english(word)
+                t = (englishword, word)
+                self.c.execute('update dim_word set english_word = ? where word = ?', t)
+                row = (row[0], englishword)
+            self.word_skey_dblookup += 1
+            self.word_skey_cache[word] = row
+
+        self.word_skey_request += 1
+        return self.word_skey_cache[word]
+
+    def write_daily_followers(self, tweeter_skey, date_skey, followers_count):
+        # mark_database_activity()
+        t = (tweeter_skey, date_skey)
+        self.c.execute('select followers_count from fact_daily_followers where tweeter_skey = ? and date_skey = ?', t)
+        row = self.c.fetchone()
+        if row is None:
+            t = (tweeter_skey, date_skey, followers_count)
+            self.c.execute('insert into fact_daily_followers (tweeter_skey, date_skey, followers_count) values (?,?,?)',
+                           t)
+        elif followers_count != row[0]:
+            t = (followers_count, tweeter_skey, date_skey)
+            self.c.execute(
+                'update fact_daily_followers set followers_count = ? where tweeter_skey = ? and date_skey = ?', t)

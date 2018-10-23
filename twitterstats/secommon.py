@@ -1,4 +1,4 @@
-import env
+# import env
 import json
 import urllib
 from urllib.request import Request, urlopen
@@ -19,7 +19,7 @@ log_sequence = 0
 logger = logging.getLogger(__name__)
 
 
-def getLogger(script="pps"):
+def get_logger(script="pps"):
     # create logger
     logger = logging.getLogger(script)
     logger.setLevel(logging.DEBUG)
@@ -39,7 +39,7 @@ def getLogger(script="pps"):
     return logger
 
 
-def postToPortal(type, jdata):
+def post_to_portal(type, jdata, env):
     jtext = json.dumps(jdata)
     # log("-" * 50)
     logger.debug("PostToPortal request (length=%i): %s", len(jtext), jtext)
@@ -85,10 +85,10 @@ def log_error(message):
         myfile.write((msg + u"\n\n").encode('utf8'))
 
 
-def readCSVHash(file, removeZero=False):
+def read_csv_hash(file, removeZero=False):
     result = {}
 
-    with open(file, 'rb') as csvfile:
+    with open(file, 'r') as csvfile:
         csvreader = csv.reader(csvfile)
         for row in csvreader:
             if len(row) == 2 and (int(row[1]) != 0 or removeZero == False):
@@ -113,8 +113,12 @@ def rank_words(myfile, days):
     return [x[0] for x in sorted(words.items(), key=operator.itemgetter(1), reverse=True)]
 
 
-def fileTimestamp():
+def file_timestamp():
     return datetime.datetime.now().strftime('%Y_%m_%d_%H%M%S')
+
+
+def now():
+    return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 
 def today():
@@ -125,15 +129,15 @@ def yesterday():
     return (datetime.datetime.now() - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
 
 
-def saveList(mylists, filename):
-    with open(filename, "wb") as f:
+def save_list(mylists, filename):
+    with open(filename, "w") as f:
         writer = csv.writer(f)
         for row in mylists:
             # writer.writerows(mylists)
-            writer.writerow([s.encode("utf-8") for s in row])
+            writer.writerow(row)
 
 
-def getDbFilename(dbtype='se', date=None):
+def get_db_filename(dbtype='se', date=None):
     filedate = '' if date is None else '_%s' % date.replace('-', '_')
     filename = "data/%s%s.db" % (dbtype, filedate)
     if not os.path.isfile(filename):
