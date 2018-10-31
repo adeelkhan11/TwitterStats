@@ -42,4 +42,3 @@ class Environment:
             "%a %b %d %H:%M:%S %Y") + timedelta(
             hours=self.time_zone)).strftime(
             '%Y-%m-%d %H:%M:%S')
-

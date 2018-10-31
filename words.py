@@ -1,4 +1,4 @@
-import sys
+import argparse
 import re
 import time
 
@@ -42,7 +42,7 @@ MAX_STATUS_ID = 9999999999999999999999
 
 
 class Words:
-    def __init__(self, environment, hashtag, user, category, tags_list):
+    def __init__(self, environment, hashtag, tags_list):
         self.env = environment
         self.hashtag = hashtag
 
@@ -114,14 +114,14 @@ class Words:
             self.pull_trends(tags_list)
         elif hashtag == 'home_timeline':
             status_count = self.pull_data(hashtag)
-            print('{} statuses pulled.'.format(status_count))
+            logger.info('{} statuses pulled.'.format(status_count))
             self.write_data()
         elif hashtag == 'lists':
             lists = self.twitters[self.db_summary.polling_token_index].GetLists(screen_name=self.env.polling_account)
-            print('{} lists for account {}.'.format(len(lists), self.env.polling_account))
+            logger.info('{} lists for account {}.'.format(len(lists), self.env.polling_account))
             for l in lists:
                 status_count = self.pull_data(l.slug)
-                print('{} statuses pulled for list {}.'.format(status_count, l.slug))
+                logger.info('{} statuses pulled for list {}.'.format(status_count, l.slug))
             self.write_data()
 
         self.db.disconnect()
@@ -141,7 +141,7 @@ class Words:
             max_id = id_range.max_id
             since_id = id_range.min_id
             statuses = None
-            print('Range: {:35} {:20} {:20}'.format(trend.name, since_id, 'None' if max_id is None else max_id))
+            logger.info('Range: {:35} {:20} {:20}'.format(trend.name, since_id, 'None' if max_id is None else max_id))
             while statuses is None or len(statuses) >= 50:
                 statuses = self.api.GetSearch(term=trend.name, result_type='recent', count=100,
                                               include_entities=False, max_id=max_id, since_id=since_id)
@@ -155,9 +155,9 @@ class Words:
                 id_range.processed = True
                 request_count += 1
 
-                print('{:40}  {:20} {:20} {:5} {:5.2f} {}'.format(trend.name, since_id,
-                                                                  'None' if max_id is None else max_id,
-                                                                  trend.get_status_count(10), score, trend.state))
+                logger.info('{:40}  {:20} {:20} {:5} {:5.2f} {}'.format(trend.name, since_id,
+                                                                        'None' if max_id is None else max_id,
+                                                                        trend.get_status_count(10), score, trend.state))
 
                 if score < -1.5 and status_count > 100:
                     trend.state = 'AUTO_DEL'
@@ -345,9 +345,9 @@ class Words:
                         self.data[status_date]['tag_tags'][tag][tag2] = 1
 
         # remove links
-        text = re.sub(r"(?<![A-Za-z0-9_])https?://[^ ,;'\(\)\[\]\<\>\{\}]+", '', status_text, flags=re.IGNORECASE)
+        text = re.sub(r"(?<![A-Za-z0-9_])https?://[^ ,;'()\[\]<>{}]+", '', status_text, flags=re.IGNORECASE)
 
-        alist = re.split('[, \.;\'\"\(\)\{\}\[\]\<\>:?\/\\=+\-~`!#^&\*\n]+', text)
+        alist = re.split('[, .;\'\"(){\}\[\]<>:?/=+\\\-~`!#^&*\n]+', text)
         tweetwords = list()
         for item in alist:
             nitem = item.strip(' ,.-+()[]:\'\"').lower()
@@ -385,11 +385,9 @@ class Words:
                 else:
                     self.data[status_date]['tweeter_words'][tweeter][nitem] = 1
 
-        # print tweetwords
-        tweetwordsset = set(tweetwords)
-        tweetwordstext = u'~' + u'~'.join(
+        tweet_words_text = u'~' + u'~'.join(
             [self.db.get_word_skey(x, self.date)[1] for x in sorted(set(tweetwords))]) + u'~'
-        self.db.update_tweet_words(status_id, tweetwordstext)
+        self.db.update_tweet_words(status_id, tweet_words_text)
 
     def get_words(self, statuses, trend=None):
         # max_id = 0
@@ -435,8 +433,6 @@ class Words:
                 retweet_created_at = self.env.get_local_timestamp(status.retweeted_status.created_at)
                 retweet_screen_name = status.retweeted_status.user.screen_name
 
-            #     def tweet_is_duplicate(self, id_, created_at, screen_name, text, tweeter_skey, retweet_count, in_reply_to_status_id,
-            #                            date_skey, retweet_id, retweet_created_at, retweet_screen_name, batch_id):
             # check if duplicate and insert if not duplicate
             status_date = self.env.get_local_date(status.created_at)
             status_created_at = self.env.get_local_timestamp(status.created_at)
@@ -474,18 +470,19 @@ class Words:
                                                                                               max_id=max_id,
                                                                                               include_entities=False)
             else:
-                statuses = self.twitters[self.db_summary.polling_token_index].GetListTimeline(owner_screen_name=self.env.polling_account,
-                                                                                              slug=list_name,
-                                                                                              count=200,
-                                                                                              since_id=since_id,
-                                                                                              max_id=max_id,
-                                                                                              include_entities=False)
+                statuses = self.twitters[self.db_summary.polling_token_index].GetListTimeline(
+                    owner_screen_name=self.env.polling_account,
+                    slug=list_name,
+                    count=200,
+                    since_id=since_id,
+                    max_id=max_id,
+                    include_entities=False)
 
             if len(statuses) > 0:
                 self.get_words(statuses)
                 all_statuses.extend(statuses)
                 max_id = statuses[-1].id - 1
-                print('{}  {}'.format(statuses[-1].id, len(statuses)))
+                logger.info('{}  {}'.format(statuses[-1].id, len(statuses)))
 
         if len(all_statuses) > 0:
             max_id = max([status.id for status in all_statuses])
@@ -497,42 +494,21 @@ class Words:
 
 def main():
     env = defaults.get_environment()
-    if len(sys.argv) < 2:
-        print('Incorrect number of arguments.')
-        exit(1)
+    parser = argparse.ArgumentParser(description='Download Twitter data.')
+    parser.add_argument('command',
+                        help='trends, lists or comma separated hashtags')
+    args = parser.parse_args()
 
-    # hashtag = ''
-    user = ''
-    tags_list = None
-    category = None
-    if sys.argv[1] == 'home_timeline':
-        hashtag = sys.argv[1]
-        logger.info(hashtag)
-    elif sys.argv[1] == 'user':
-        hashtag = sys.argv[1]
-        user = sys.argv[2]
-        logger.info(user)
-    elif sys.argv[1] == 'users':
-        hashtag = sys.argv[1]
-        category = sys.argv[2]
-        logger.info(category + " Tweeps")
-    elif sys.argv[1] == 'trends':
-        hashtag = sys.argv[1]
-        logger.info("Trends")
-    elif sys.argv[1] == 'lists':
-        hashtag = sys.argv[1]
-        logger.info("Lists")
-    else:
-        alist = sys.argv[1].split(',')
-        tags_list = []
-        for item in alist:
-            hashtag = '#' + item
-            tags_list.append({'tag': hashtag})
-        hashtag = 'trends'
+    if args.command in ('trends', 'lists'):
+        command = args.command
+        tags_list = None
         logger.info('Trendlist')
+    else:
+        command = 'trends'
+        tags_list = [{'tag': '#{}'.format(t)} for t in args.command.split(',')]
 
     # database = env.database
-    words = Words(env, hashtag, user, category, tags_list)
+    _ = Words(env, command, tags_list)
 
 
 if __name__ == '__main__':

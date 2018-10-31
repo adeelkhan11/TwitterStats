@@ -6,7 +6,7 @@ from typing import List
 from twitterstats.dbutil import DBUtil
 from twitterstats import secommon
 # from twitterstats.singleton import Singleton
-from twitterstats.secommon import now
+from twitterstats.secommon import now, today
 from twitterstats.urdu import urdu_to_english
 
 logger = logging.getLogger(__name__)
@@ -655,3 +655,33 @@ class DB(DBUtil):
             t = (followers_count, tweeter_skey, date_skey)
             self.c.execute(
                 'update fact_daily_followers set followers_count = ? where tweeter_skey = ? and date_skey = ?', t)
+
+    def get_tweeter_promotion_stats(self):
+        sql = """select t.screen_name, sum(case when ifnull(w.relevance, 'bob') = 'positive' then 1 else 0 end) pos
+        , sum(case when ifnull(w.relevance, 'bob') = 'negative' then 1 else 0 end) neg
+        , sum(case when ifnull(w.generic, 'bob') = 'B' then 1 else 0 end) blocked, t.category, t.relevance_score, t.followers_count
+        from dim_word w 
+        join fact_daily_hashtag_tweeter ht
+         on w.word_skey = ht.tag_skey
+         join dim_tweeter t on t.tweeter_skey = ht.tweeter_skey 
+         where ifnull(t.category, 'Z') >= 'C' 
+        and ifnull(t.category, 'A') < 'G' 
+        and (w.relevance is not null or w.generic is not null)
+        group by t.screen_name 
+        having count(*) >= 5"""
+
+        self.c.execute(sql)
+        return self.c.fetchall()
+
+    def set_tweeter_category(self, screen_name, category, relevance_score):
+        t = (category, today(), relevance_score, screen_name)
+        self.c.execute(
+            "update dim_tweeter set category = ?, category_date = ?, relevance_score = ? WHERE screen_name = ?",
+            t)
+
+    def set_tweeter_category_by_date(self, date_category_was_set, current_category, new_category):
+        t = (new_category, today(), current_category, date_category_was_set)
+        self.c.execute(
+            "update dim_tweeter set category = ?, category_date = ? WHERE category = ? AND category_date < ?",
+            t)
+        logger.info('{} records demoted from {} to {}.'.format(self.c.rowcount, current_category, new_category))
