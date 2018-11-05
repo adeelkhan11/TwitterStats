@@ -449,15 +449,13 @@ def main():
         tweetbucket.append(tweet)
         if len(tweetbucket) >= 3:
             data = {'tweets': tweetbucket}
-            url = env.base_url + 'deliver'
-            Publisher.publish(url, data, 'posted', env.default_account)
+            Publisher.publish(env, data, 'posted')
             tweetbucket = list()
             time.sleep(10)
 
     if len(tweetbucket) > 0:
         data = {'tweets': tweetbucket}
-        url = env.base_url + 'deliver'
-        Publisher.publish(url, data, 'posted', env.default_account)
+        Publisher.publish(env, data, 'posted')
 
     db_summary.disconnect()
 

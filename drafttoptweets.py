@@ -83,7 +83,6 @@ with DB(env, datetime.datetime.now().strftime('%Y-%m-%d')) as db:
         tweet.drafted_date = drafted_date
         tweet.account = env.default_account
 
-    url = env.base_url + 'deliver'
     data = {'tweets': sorted_x}
-    Publisher.publish(url, data, 'draft', env.default_account)
+    Publisher.publish(env, data, 'draft')
     db.set_retweeted(sorted_x)

@@ -99,7 +99,7 @@ class DBSummary(DBUtil):
         results.extend(rows)
         t = ('pend-post', 'pend-rej', 'trends', 'mentions', 'trenders')
         self.c.execute(
-            'SELECT t_id, type, head, tail, image_head, date_nkey, period, status, tweet_id, account, background_image'
+            'SELECT type, head, tail, image_head, date_nkey, period, status, tweet_id, account, background_image, t_id'
             ' from tweet where status IN (?, ?) and type in (?, ?, ?) order by drafted_at LIMIT 10',
             t)
         rows = self.c.fetchall()
@@ -108,7 +108,7 @@ class DBSummary(DBUtil):
 
         tweets = list()
         for row in results:
-            tweet = PublishTweet(self, *row)
+            tweet = PublishTweetWritable(*row, self)
             # tweet = {'t_id': row[0], 'type': row[1], 'head': row[2], 'tail': row[3],
             #          'image_head': row[4], 'date_nkey': row[5], 'period': row[6],
             #          'status': row[7], 'tweet_id': row[8], 'account': row[9],
@@ -147,8 +147,6 @@ class DBSummary(DBUtil):
 
 @dataclass
 class PublishTweet:
-    db_summary: DBSummary
-    id: str
     type: str
     head: str
     tail: str
@@ -159,14 +157,54 @@ class PublishTweet:
     tweet_id: str
     account: str
     background_image: str
+    tweet_screen_name: str = None
+    drafted_at: str = None
+    trend: str = None
     items: List[PublishTweetItem] = field(default_factory=list)
+
+    def publish_dict(self):
+        result = {'type': self.type, 'head': self.head, 'tail': self.tail,
+                  'image_head': self.image_head, 'date_nkey': self.date_nkey, 'period': self.period,
+                  'account': self.account,
+                  'items': [item.publish_dict() for item in self.items]}
+        if self.status is not None:
+            result['status'] = self.status
+        if self.tweet_id is not None:
+            result['tweet_id'] = self.tweet_id
+        if self.background_image is not None:
+            result['background_image'] = self.background_image
+        if self.tweet_screen_name is not None:
+            result['tweet_screen_name'] = self.drafted_at
+        if self.drafted_at is not None:
+            result['drafted_at'] = self.drafted_at
+        if self.trend is not None:
+            result['trend'] = self.trend
+        return result
+
+
+@dataclass
+class PublishTweetWritable(PublishTweet):
+    id: str = None
+    db_summary: DBSummary = None
 
     def save_status(self):
         self.db_summary.save_tweet_posted_status(self.id, self.status)
 
     def publish_dict(self):
-        return {'t_id': self.id, 'type': self.type, 'head': self.head, 'tail': self.tail,
-                'image_head': self.image_head, 'date_nkey': self.date_nkey, 'period': self.period,
-                'status': self.status, 'tweet_id': self.tweet_id, 'account': self.account,
-                'background_image': self.background_image,
-                'items': [item.publish_dict() for item in self.items]}
+        result = {'t_id': self.id, 'type': self.type, 'head': self.head, 'tail': self.tail,
+                  'image_head': self.image_head, 'date_nkey': self.date_nkey, 'period': self.period,
+                  'account': self.account,
+                  'items': [item.publish_dict() for item in self.items]}
+        if self.status is not None:
+            result['status'] = self.status
+        if self.tweet_id is not None:
+            result['tweet_id'] = self.tweet_id
+        if self.background_image is not None:
+            result['background_image'] = self.background_image
+        if self.tweet_screen_name is not None:
+            result['tweet_screen_name'] = self.drafted_at
+        if self.drafted_at is not None:
+            result['drafted_at'] = self.drafted_at
+        if self.trend is not None:
+            result['trend'] = self.trend
+        return result

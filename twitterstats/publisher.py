@@ -1,14 +1,25 @@
 import json
 import urllib.request
 import urllib.parse
+from dataclasses import is_dataclass
 
 
 class Publisher:
     @staticmethod
-    def publish(url, data, type_, account):
+    def publish(env, data, type_):
+        url = env.base_url + 'deliver'
+        account = env.default_account
         payload = {}
         for k, v in data.items():
-            payload[k] = [x.publish_dict() for x in v]
+            if isinstance(v, list):
+                value = list()
+                for val in v:
+                    value.append(val.publish_dict() if is_dataclass(val) else val)
+            elif is_dataclass(v):
+                value = v.publish_dict()
+            else:
+                value = v
+            payload[k] = value
         payload_json = json.dumps(payload)
         values = {'data': payload_json,
                   'type': type_,
