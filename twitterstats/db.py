@@ -140,7 +140,7 @@ class DB(DBUtil):
         self.commit()
         self.disconnect()
 
-    def connect(self, date):
+    def connect(self, date='2999-12-31'):
         database = self.se_database('se', date)
         dim_database = self.se_database('se_dimension', date)
         print('Databases: {},  {}'.format(database, dim_database))
@@ -840,6 +840,41 @@ class DB(DBUtil):
                 WHERE screen_name_lower = ?"""
         self.c.execute(sql, (screen_name,))
         return self.c.fetchone()[0]
+
+    def get_trends_relevance(self):
+        sql = '''select dh.hashtag, w.relevance, sum(dh.count)
+            from fact_daily_hashtag dh
+            join dim_word w on w.word_skey = dh.word_skey
+            join dim_date d on d.date_skey = dh.date_skey
+            where w.generic is null -- and d.date >= ?
+            group by dh.hashtag having sum(dh.count) > 10
+        '''
+        # t = (yesterday, )
+        self.c.execute(sql)
+        return self.c.fetchall()
+
+    def get_related_trends(self):
+        sql = '''SELECT IFNULL(w1.hashtag, w1.word), IFNULL(w2.hashtag, w2.word), sum(count)
+        FROM fact_daily_hashtag_hashtag dhh
+        JOIN dim_word w1
+          ON w1.word_skey = dhh.tag_skey
+        JOIN dim_word w2
+          ON w2.word_skey = dhh.other_tag_skey
+        group by IFNULL(w1.hashtag, w1.word), IFNULL(w2.hashtag, w2.word)
+        order by IFNULL(w1.hashtag, w1.word), sum(count) desc
+        '''
+
+        self.c.execute(sql)
+        return self.c.fetchall()
+
+    def get_top_tag_scores(self):
+        sql = '''SELECT tag, tweet_count, score
+        FROM tag_score
+        order by score_time desc
+        '''
+
+        self.c.execute(sql)
+        return self.c.fetchall()
 
     def set_tweeter_category(self, screen_name, category, relevance_score):
         t = (category, today(), relevance_score, screen_name)
