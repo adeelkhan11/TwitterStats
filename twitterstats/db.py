@@ -148,11 +148,19 @@ class DB(DBUtil):
         self.c = self.conn.cursor()
         self.c.execute('ATTACH DATABASE ? AS dim', (dim_database,))
         self.c.execute('SELECT min_date from db_baseline')
-        min_date = self.c.fetchone()[0]
-        if min_date != date and not (min_date < date and database == self.env.database):
+        self.min_date = self.c.fetchone()[0]
+        if self.min_date != date and not (self.min_date < date and database == self.env.database):
             logger.critical("Could not find database for date %s", date)
             exit(1)
         # return self.c
+
+    def fetchall(self, sql, t):
+        self.c.execute(sql, t)
+        return self.c.fetchall()
+
+    def mark_tweeter_as_bot(self, screen_name):
+        t = ('R', self.min_date, -2, screen_name)
+        self.c.execute('UPDATE dim_tweeter set category = ?, category_date = ?, bot_score = ? WHERE screen_name = ?', t)
 
     def set_retweeted(self, tweets):
         for tweet in tweets:
@@ -519,6 +527,50 @@ class DB(DBUtil):
                 'update fact_daily_hashtag_word set count = ? where word_skey = ? and tag_skey = ? and date_skey = ?',
                 t)
 
+    def get_rt_variance(self, query_date):
+        t = (query_date + ' 00:00:00', query_date + ' 23:59:59')
+        self.c.execute(
+            """select s.screen_name, count(distinct retweet_screen_name), count(*), t.friends_count,
+            t.followers_count, t.created_at, t.tweet_date, t.category
+            from fact_status s
+            join dim_tweeter t on t.tweeter_skey = s.tweeter_skey
+            where retweet_id != 0
+            and s.created_at between ? and ?
+            group by s.screen_name, t.friends_count, t.followers_count, t.created_at, t.tweet_date, t.category""",
+            t)
+        return self.c.fetchall()
+
+    # def get_bot_suspects(self, query_date):
+    #     t = (query_date + ' 00:00:00', query_date + ' 23:59:59')
+    #     self.c.execute(
+    #         """select distinct s.screen_name
+    #         from fact_status s
+    #         join dim_tweeter t on t.tweeter_skey = s.tweeter_skey
+    #         where created_at between ? and ?""",
+    #         t)
+    #     return self.c.fetchall()
+
+    def get_tweet_history(self, query_date):
+        t = (query_date + ' 00:00:00', query_date + ' 23:59:59')
+        self.c.execute(
+            """select t.screen_name, t.tweet_date, max(s.id)
+            from dim_tweeter t
+            left outer join fact_status s on s.tweeter_skey = t.tweeter_skey and s.retweet_id = 0
+            and s.created_at between ? and ?
+            where (TRIM(IFNULL(t.tweet_date, '')) != ''
+            or s.id is not null)
+            group by t.screen_name, t.tweet_date""",
+            t)
+        return self.c.fetchall()
+
+    def set_tweet_history(self, screen_name, tweet_history, bot_date):
+        t = (bot_date, tweet_history, screen_name.lower())
+        self.c.execute('update dim_tweeter set bot_date = ?, tweet_date = ? where screen_name_lower = ?', t)
+
+    def set_bot_score(self, screen_name, bot_score):
+        t = (today(), bot_score, screen_name.lower())
+        self.c.execute('update dim_tweeter set bot_date = ?, bot_score = ? where screen_name_lower = ?', t)
+
     def write_tweeter_word(self, tweetdate, tweeter, word, count):
         # mark_database_activity()
         date_skey = self.get_date_skey(tweetdate)
@@ -876,11 +928,72 @@ class DB(DBUtil):
         self.c.execute(sql)
         return self.c.fetchall()
 
-    def set_tweeter_category(self, screen_name, category, relevance_score):
-        t = (category, today(), relevance_score, screen_name)
+    def get_relevant_words(self):
+        relevant_words = dict()
+        self.c.execute('SELECT word, relevance FROM dim_word where relevance is not null')
+        rows = self.c.fetchall()
+        for word, relevance in rows:
+            relevant_words[word] = relevance
+        return relevant_words
+
+    def get_generic_words(self):
+        generic_words = dict()
+        self.c.execute('SELECT word, generic FROM dim_word where generic is not null')
+        rows = self.c.fetchall()
+        for word, generic in rows:
+            generic_words[word] = generic
+        return generic_words
+
+    def get_tag_discovery_result(self, tag):
+        t = (tag,)
+        self.c.execute('SELECT result FROM tag_discovery where lower(tag) = ? order by discovery_time desc limit 1',
+                       t)
+        row = self.c.fetchone()
+        return row[0] if row is not None else None
+
+    def get_top_hashtags(self, start_date, end_date):
+        # This should be changed to a single day.
+        t = (start_date, end_date)
         self.c.execute(
-            "update dim_tweeter set category = ?, category_date = ?, relevance_score = ? WHERE screen_name = ?",
+            """select dh.hashtag, sum(dh.count)
+            from fact_daily_hashtag dh
+            join dim_word w on w.word_skey = dh.word_skey
+            join dim_date d on d.date_skey = dh.date_skey
+            where w.generic is null
+            and d.date >= ?
+            and d.date < ?
+            group by dh.hashtag
+            having sum(dh.count) > 30
+            order by sum(dh.count)""",
             t)
+
+        return self.c.fetchall()
+
+    def set_word_hashtag(self, word, hashtag):
+        t = (hashtag, word)
+        self.c.execute('update dim_word set hashtag = ? where word = ?', t)
+
+    def save_tag_discovery(self, tag, result):
+        t = (tag, result, now())
+        self.c.execute('INSERT INTO tag_discovery (tag, result, discovery_time) VALUES (?, ?, ?)', t)
+
+    def set_word_relevance(self, word, relevance):
+        self.c.execute('UPDATE dim_word SET relevance = ? where word = ?',
+                       (relevance, word.lower()))
+
+    def set_word_generic(self, word, generic):
+        self.c.execute('UPDATE dim_word SET generic = ? where word = ?',
+                       (generic, word.lower()))
+
+    def set_tweeter_category(self, screen_name, category, relevance_score=None):
+        if relevance_score is None:
+            t = (category, today(), screen_name.lower())
+            self.c.execute('UPDATE dim_tweeter set category = ?, category_date = ? WHERE screen_name_lower = ?', t)
+        else:
+            t = (category, today(), relevance_score, screen_name)
+            self.c.execute(
+                "update dim_tweeter set category = ?, category_date = ?, relevance_score = ? WHERE screen_name = ?",
+                t)
 
     def set_tweeter_category_by_date(self, date_category_was_set, current_category, new_category):
         t = (new_category, today(), current_category, date_category_was_set)

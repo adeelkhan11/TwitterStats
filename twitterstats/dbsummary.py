@@ -87,6 +87,12 @@ class DBSummary(DBUtil):
 
         return _tokens
 
+    def get_tweet_status(self, t_id):
+        t = (t_id,)
+        self.c.execute('SELECT status FROM tweet WHERE t_id = ?', t)
+        row = self.c.fetchone()
+        return row[0] if row is not None else None
+
     def get_pending_tweets(self):
         results = list()
         t = ('pend-post', 'pend-rej', 'retweet')
@@ -143,6 +149,27 @@ class DBSummary(DBUtil):
         t = (tweet_id, self.env.default_account, now())
         self.c.execute('insert into retweets (tweet_id, account, retweeted_at) values (?, ?, ?)', t)
         self.commit()
+
+    def save_tweet(self, tweet):
+        t = (tweet['t_id'], tweet['type'], tweet['tweet_id'], tweet['head'], tweet['tail'],
+             tweet['tweet_screen_name'], tweet['tweet_retweet_count'], tweet['status'],
+             tweet['tweet_created_at'], tweet['drafted_at'], tweet['submitted_at'],
+             tweet['image_head'], tweet['date_nkey'], tweet['period'], tweet['account'],
+             tweet['tweeter_type'], tweet['trend'], tweet['background_image'])
+        self.c.execute('INSERT INTO tweet (t_id, type, tweet_id, head, tail, tweet_screen_name, ' +
+                       'tweet_retweet_count, status, tweet_created_at, drafted_at, submitted_at, ' +
+                       'image_head, date_nkey, period, account, tweeter_type, trend, background_image) ' +
+                       'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', t)
+
+    def save_tweet_item(self, tweet, item):
+        t = (
+            tweet['t_id'], item['rank'], item['subrank'], item['score'], item['tweet_text'],
+            item['display_image'],
+            item['display_text'], item['selected'])
+        self.c.execute(
+            """INSERT INTO tweet_item (t_id, rank, subrank, score, tweet_text, display_image, display_text, selected)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            t)
 
 
 @dataclass

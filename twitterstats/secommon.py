@@ -129,6 +129,10 @@ def yesterday():
     return (datetime.datetime.now() - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
 
 
+def nvl(a, b):
+    return a if a is not None else b
+
+
 def save_list(mylists, filename):
     with open(filename, "w") as f:
         writer = csv.writer(f)

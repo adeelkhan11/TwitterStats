@@ -29,3 +29,13 @@ class Publisher:
         response = urllib.request.urlopen(url, data)
         the_page = response.read()
         print(the_page)
+
+    @staticmethod
+    def get_pending(env):
+        url = env.base_url + 'getpending?account=' + env.default_account
+        response = urllib.request.urlopen(url)
+        the_page = response.read()
+
+        data = json.loads(the_page)
+        print(data)
+        return data
