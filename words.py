@@ -499,7 +499,7 @@ def main():
                         help='trends, lists or comma separated hashtags')
     args = parser.parse_args()
 
-    if args.command in ('trends', 'lists'):
+    if args.command in ('trends', 'lists', 'home_timeline'):
         command = args.command
         tags_list = None
         logger.info('Trendlist')
