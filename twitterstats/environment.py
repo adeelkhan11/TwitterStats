@@ -31,6 +31,8 @@ class Environment:
         self.post = 'post'
         self.tweet_delay = 55
 
+        self.lists = dict()
+
     def get_local_date(self, twitter_time):
         return (datetime.strptime(
             twitter_time.replace(' +0000', ''),

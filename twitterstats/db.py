@@ -731,6 +731,57 @@ class DB(DBUtil):
             self.c.execute(
                 'update fact_daily_followers set followers_count = ? where tweeter_skey = ? and date_skey = ?', t)
 
+    def get_list_additions(self):
+        sql = """select screen_name, category, list
+        from dim_tweeter
+        where category in ('A', 'B', 'C', 'D')
+        and (list is null or (list not like category || '%' and list not like 'ERROR%'))
+        order by category, category_date
+        LIMIT 50"""
+        self.c.execute(sql)
+        return self.c.fetchall()
+
+    def get_list_removals(self):
+        sql = """select screen_name, category, list
+        from dim_tweeter
+        where (category is null or category not in ('A', 'B', 'C', 'D'))
+        and list is not null
+        order by category, category_date
+        LIMIT 50"""
+        self.c.execute(sql)
+        return self.c.fetchall()
+
+    def add_to_list(self, screen_name, list_name):
+        sql = """update dim_tweeter
+        set list = ?
+        where screen_name = ?"""
+        t = (list_name, screen_name)
+        self.c.execute(sql, t)
+
+    def remove_from_list(self, screen_name):
+        self.add_to_list(screen_name, list_name=None)
+
+    def set_env_list_count(self, list_name, count):
+        try:
+            for l in self.env.lists[list_name[0]]:
+                if l['name'] == list_name:
+                    l['count'] = count
+        except TypeError:
+            logger.error(f'Setting list {list_name} count to {count}')
+            logger.error(self.env.lists)
+            raise
+
+    def load_list_levels(self):
+        sql = """select list, count(*)
+        from dim_tweeter
+        where list is not null
+        and list not like 'ERROR%'
+        group by list"""
+
+        self.c.execute(sql)
+        for list_name, count in self.c.fetchall():
+            self.set_env_list_count(list_name, count)
+
     def get_tweeter_promotion_stats(self):
         sql = """select t.screen_name, sum(case when ifnull(w.relevance, 'bob') = 'positive' then 1 else 0 end) pos
         , sum(case when ifnull(w.relevance, 'bob') = 'negative' then 1 else 0 end) neg
