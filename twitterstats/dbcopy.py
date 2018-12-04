@@ -10,7 +10,7 @@ class DBCopy:
 
         self.copy_schema()
         
-    def copy_table(self, table_name, source_query, source_query_parameters):
+    def copy_table(self, table_name, source_query, source_query_parameters=None):
         logger.info(table_name)
         self.old_cursor.execute(f'PRAGMA table_info({table_name})')
         rows = self.old_cursor.fetchall()
@@ -19,7 +19,10 @@ class DBCopy:
         data_markers = ', '.join(['?'] * len(column_names.split(',')))
 
         cnt = 0
-        self.old_cursor.execute(source_query.format(column_names), source_query_parameters)
+        if source_query_parameters is None:
+            self.old_cursor.execute(source_query.format(column_names))
+        else:
+            self.old_cursor.execute(source_query.format(column_names), source_query_parameters)
         row = self.old_cursor.fetchone()
         while row is not None:
             cnt += 1
