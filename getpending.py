@@ -6,6 +6,8 @@ from twitterstats.db import DB
 from twitterstats.dbsummary import DBSummary
 from twitterstats.publisher import Publisher
 from twitterstats.secommon import today, now, nvl
+from twitterstats.secommon import yesterday
+from twitterstats.secommon import yesterday_file
 
 logger = logging.getLogger('getpending')
 
@@ -43,13 +45,10 @@ def main():
                 already_processed.append(tweet)
 
         if len(trenders_published) > 0:
-            with open(
-                    "botdata/trenders_all_%s.txt" % (datetime.datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d'),
-                    'a') as f:
+            with open(f'{environment.bot_data_directory}/trenders_all_{yesterday_file()}.txt', 'a') as f:
                 for sn in trenders_all:
                     f.write("%s\n" % sn)
-            with open("botdata/trenders_published_%s.txt" % (datetime.datetime.now() - timedelta(days=1)).strftime(
-                    '%Y-%m-%d'), 'a') as f:
+            with open(f'{environment.bot_data_directory}/trenders_published_{yesterday_file()}.txt', 'a') as f:
                 for sn in trenders_published:
                     f.write("%s\n" % sn)
 

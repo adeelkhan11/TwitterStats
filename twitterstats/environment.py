@@ -6,8 +6,10 @@ class Environment:
 
     def __init__(self, environment, base_url, publishing_account, polling_account, consumer_key, consumer_secret):
         self.database = '{}{}/data/ts.db'.format(self.BASE_PATH, environment)
+        self.database_temp = '{}{}/data/ts_temp.db'.format(self.BASE_PATH, environment)
         self.database_old = '{}{}/data/ts_{{}}.db'.format(self.BASE_PATH, environment)
         self.dimension_database = '{}{}/data/ts_dimension.db'.format(self.BASE_PATH, environment)
+        self.dimension_database_temp = '{}{}/data/ts_dimension_temp.db'.format(self.BASE_PATH, environment)
         self.dimension_database_old = '{}{}/data/ts_dimension_{{}}.db'.format(self.BASE_PATH, environment)
         self.summary_database = '{}{}/data/ts_summary.db'.format(self.BASE_PATH, environment)
         self.temp_file_directory = '{}{}/scratch'.format(self.BASE_PATH, environment)

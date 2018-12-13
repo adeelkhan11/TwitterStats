@@ -1,22 +1,24 @@
 # Instead of starting new database, it copies data since the date provided so it doesn't need to be loaded again.
-import argparse
-
+import os
 import sqlite3
-from datetime import timedelta, datetime as time
+from datetime import timedelta, datetime
 
 import defaults
 from twitterstats.db import DB
 import logging
 
-from twitterstats.dbcopy import DBCopy
-from twitterstats.secommon import today
+from twitterstats.dbcopy import DBCopy, ArchiveFileExistsError
+from twitterstats.secommon import today, last_month
 
 logger = logging.getLogger('new_dim_db')
 
 
 class NewDimDB:
-    def __init__(self, environment, old_date, new_database):
+    def __init__(self, environment, old_date):
         self.environment = environment
+        archive_file = environment.dimension_database_old.format(last_month().replace('-', '_'))
+        if os.path.isfile(archive_file):
+            raise ArchiveFileExistsError()
 
         self.old_db = sqlite3.connect(environment.dimension_database)
         self.old_c = self.old_db.cursor()
@@ -35,7 +37,7 @@ class NewDimDB:
         self.old_db = DB(environment, old_date)
 
         # don't connect to new db via regular function, the global connection on db.py should be the main db
-        conn2 = sqlite3.connect(new_database)
+        conn2 = sqlite3.connect(environment.dimension_database_temp)
         self.new_c = conn2.cursor()
         
         db_copy = DBCopy(self.old_c, self.new_c)
@@ -46,28 +48,28 @@ class NewDimDB:
             conn2.close()
             return
 
-        datedt = time.strptime(date, '%Y-%m-%d')
-        recentdate = (datedt - timedelta(days=30)).strftime('%Y-%m-%d')
-        twitterdt = time.strptime('2006-03-21 09:00:00', '%Y-%m-%d %H:%M:%S')
-        futuredate = (datedt + timedelta(days=2000)).strftime('%Y-%m-%d')
+        date_dt = datetime.strptime(date, '%Y-%m-%d')
+        recent_date = (date_dt - timedelta(days=30)).strftime('%Y-%m-%d')
+        twitter_dt = datetime.strptime('2006-03-21 09:00:00', '%Y-%m-%d %H:%M:%S')
+        future_date = (date_dt + timedelta(days=2000)).strftime('%Y-%m-%d')
 
-        logger.info('Recentdate: %s', recentdate)
+        logger.info('Recent date: %s', recent_date)
 
         logger.info("DIM_DATE")
         cnt = 0
-        dt = twitterdt.strftime('%Y-%m-%d')
+        dt = twitter_dt.strftime('%Y-%m-%d')
         i = 1
-        while dt < futuredate:
+        while dt < future_date:
             cnt += 1
             # print "Date: ", i, dt
             t = (i, dt)
             self.new_c.execute('insert into dim_date (date_skey, date) values (?, ?)', t)
-            dt = (twitterdt + timedelta(days=i)).strftime('%Y-%m-%d')
+            dt = (twitter_dt + timedelta(days=i)).strftime('%Y-%m-%d')
             i += 1
         logger.info('%d rows', cnt)
 
         # DIM_TWEETER
-        t = (recentdate,)
+        t = (recent_date,)
         sql = """select {}
         from dim_tweeter 
         where category is not null
@@ -102,15 +104,15 @@ class NewDimDB:
         conn2.commit()
         conn2.close()
 
+        db_copy.switch_files(current_file=environment.dimension_database,
+                             archive_file=archive_file,
+                             new_file=environment.dimension_database_temp)
+
 
 def main():
     env = defaults.get_environment()
-    parser = argparse.ArgumentParser(description='Copy the dimension database.')
-    parser.add_argument('new_database',
-                        help='the file name of the new database')
-    args = parser.parse_args()
 
-    _ = NewDimDB(env, today(), args.new_database)
+    _ = NewDimDB(env, today())
 
 
 if __name__ == '__main__':

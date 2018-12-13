@@ -1,34 +1,32 @@
 # Instead of starting new database, it copies data since the date provided so it doesn't need to be loaded again.
 import argparse
+import os
 
 import sqlite3
-from datetime import timedelta, datetime as time
+from datetime import timedelta, datetime
 
 import defaults
 from twitterstats.db import DB
 import logging
 
-from twitterstats.dbcopy import DBCopy
+from twitterstats.dbcopy import DBCopy, ArchiveFileExistsError
+from twitterstats.secommon import yesterday
 
 logger = logging.getLogger('new_db')
 
 
-# if len(sys.argv) < 3:
-# 	print "Incorrect number of arguments."
-# 	exit(1)
-#
-# database = sys.argv[1]
-# new_database = sys.argv[2]
-# date = sys.argv[3]
-
-
 class NewDB:
-    def __init__(self, environment, old_date, new_database, date):
+    def __init__(self, environment, date):
         self.environment = environment
+        old_date = yesterday(date)
+        archive_file = environment.database_old.format(old_date.replace('-', '_'))
+        if os.path.isfile(archive_file):
+            raise ArchiveFileExistsError()
+
         self.old_db = DB(environment, old_date)
 
         # don't connect to new db via regular function, the global connection on db.py should be the main db
-        conn2 = sqlite3.connect(new_database)
+        conn2 = sqlite3.connect(environment.database_temp)
         self.new_c = conn2.cursor()
         
         db_copy = DBCopy(self.old_db.c, self.new_c)
@@ -39,11 +37,11 @@ class NewDB:
             conn2.close()
             return
 
-        datedt = time.strptime(date, '%Y-%m-%d')
-        threedaysago = (datedt - timedelta(days=3)).strftime('%Y-%m-%d')
-        recentdate = (datedt - timedelta(days=7)).strftime('%Y-%m-%d')
+        date_dt = datetime.strptime(date, '%Y-%m-%d')
+        three_days_ago = (date_dt - timedelta(days=3)).strftime('%Y-%m-%d')
+        recent_date = (date_dt - timedelta(days=7)).strftime('%Y-%m-%d')
 
-        logger.info('Recentdate: [' + recentdate + ']')
+        logger.info('Recent date: [' + recent_date + ']')
 
         date_skey = self.old_db.get_date_skey(date)
 
@@ -74,7 +72,7 @@ class NewDB:
             on d.tag = s.tag
             group by d.tag, d.result, d.discovery_time
             having discovery_time >= ? or sum(s.tweet_count) > ?)"""
-        t = (threedaysago, 50)
+        t = (three_days_ago, 50)
         db_copy.copy_table('tag_discovery', sql, t)
 
         sql = """select {}
@@ -128,19 +126,19 @@ class NewDB:
         conn2.commit()
         conn2.close()
 
+        db_copy.switch_files(current_file=environment.database,
+                             archive_file=archive_file,
+                             new_file=environment.database_temp)
+
 
 def main():
     env = defaults.get_environment()
     parser = argparse.ArgumentParser(description='Copy the standard database.')
-    parser.add_argument('old_date',
-                        help='the date of the current database')
-    parser.add_argument('new_database',
-                        help='the new database')
     parser.add_argument('date',
                         help='the date from which the new database is active')
     args = parser.parse_args()
 
-    _ = NewDB(env, args.old_date, args.new_database, args.date)
+    _ = NewDB(env, args.date)
 
 
 if __name__ == '__main__':

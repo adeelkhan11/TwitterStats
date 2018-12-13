@@ -1,6 +1,15 @@
 import logging
+import os
 
 logger = logging.getLogger('dbcopy')
+
+
+class DBCopyError(Exception):
+    pass
+
+
+class ArchiveFileExistsError(DBCopyError):
+    pass
 
 
 class DBCopy:
@@ -45,3 +54,11 @@ class DBCopy:
         rows = self.old_cursor.fetchall()
         for sql in rows:
             self.new_cursor.execute(sql[0])
+
+    @staticmethod
+    def switch_files(current_file, archive_file, new_file):
+        if os.path.isfile(archive_file):
+            raise ArchiveFileExistsError()
+
+        os.rename(current_file, archive_file)
+        os.rename(new_file, current_file)
