@@ -284,7 +284,7 @@ class DB(DBUtil):
         logger.info("%i tag histories written." % counter)
         self.tag_history = list()
 
-    def get_name_score(self, name, screen_name, location='', timezone=''):
+    def get_name_score(self, name, screen_name, location='', timezone='', ignore_category=False):
         if self.name_scores is None:
             self.load_name_score_data()
 
@@ -293,7 +293,7 @@ class DB(DBUtil):
         category = self.sn_categories[screen_name] if screen_name in self.sn_categories else ''
 
         name_score = self.calculate_text_score(name, self.name_scores)
-        category_score = self.calculate_text_score(category, self.category_scores)
+        category_score = 0 if ignore_category else self.calculate_text_score(category, self.category_scores)
         location_score = self.calculate_text_score(location, self.location_scores)
         timezone_score = self.calculate_text_score(timezone, self.timezone_scores)
 
@@ -390,10 +390,10 @@ class DB(DBUtil):
 
     def load_name_score_data(self):
         if self.name_scores is None:
-            self.name_scores = secommon.read_csv_hash('metadata/name_score.csv', removeZero=True)
-            self.category_scores = secommon.read_csv_hash('metadata/category_score.csv', removeZero=True)
-            self.timezone_scores = secommon.read_csv_hash('metadata/timezone_score.csv', removeZero=True)
-            self.location_scores = secommon.read_csv_hash('metadata/location_score.csv', removeZero=True)
+            self.name_scores = secommon.read_csv_hash('metadata/name_score.csv', remove_zero=True)
+            self.category_scores = secommon.read_csv_hash('metadata/category_score.csv', remove_zero=True)
+            self.timezone_scores = secommon.read_csv_hash('metadata/timezone_score.csv', remove_zero=True)
+            self.location_scores = secommon.read_csv_hash('metadata/location_score.csv', remove_zero=True)
 
             sql = """select screen_name, category
                 from dim_tweeter
@@ -786,7 +786,7 @@ class DB(DBUtil):
         sql = """select t.screen_name, sum(case when ifnull(w.relevance, 'bob') = 'positive' then 1 else 0 end) pos
         , sum(case when ifnull(w.relevance, 'bob') = 'negative' then 1 else 0 end) neg
         , sum(case when ifnull(w.generic, 'bob') = 'B' then 1 else 0 end) blocked
-        , t.category, t.relevance_score, t.followers_count
+        , t.category, t.relevance_score, t.followers_count, t.name, t.location, t.time_zone
         from dim_word w 
         join fact_daily_hashtag_tweeter ht
          on w.word_skey = ht.tag_skey
@@ -799,6 +799,15 @@ class DB(DBUtil):
 
         self.c.execute(sql)
         return self.c.fetchall()
+
+    def get_tweeter_relevance_score(self, screen_name):
+        sql = """SELECT name, category, relevance_score, location, time_zone, followers_count
+            FROM dim_tweeter
+            WHERE screen_name = ?"""
+        t = (screen_name, )
+        self.c.execute(sql, t)
+        result = self.c.fetchone()
+        return result
 
     def get_tweeter_category_counts(self):
         sql = """SELECT CATEGORY, COUNT(*)
