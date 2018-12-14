@@ -32,6 +32,7 @@ class Environment:
 
         self.post = 'post'
         self.tweet_delay = 55
+        self.production = True
 
         self.lists = dict()
 

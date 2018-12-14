@@ -431,6 +431,9 @@ def main():
                 i -= 1
                 tweet_text = pub.write_tweet(tweet, i)
 
+            if not env.production:
+                tweet_text = tweet_text.replace('#', '-').replace('@', '+')
+
             img_file = pub.draw_tweet(tweet, pub.scoreWeight[action])
 
             logger.info('%3d %s', len(tweet_text), tweet_text)
