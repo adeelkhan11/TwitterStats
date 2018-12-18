@@ -21,7 +21,8 @@ class TwitterAPI:
             api = twitter.Api(consumer_key=self.environment.consumer_key,
                               consumer_secret=self.environment.consumer_secret,
                               access_token_key=token.key,
-                              access_token_secret=token.secret)
+                              access_token_secret=token.secret,
+                              timeout=10)
             self.twitters.append(api)
 
     def polling_api(self):
