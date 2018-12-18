@@ -39,9 +39,9 @@ with DB(env, datetime.datetime.now().strftime('%Y-%m-%d')) as db:
             if tweet.screen_name not in tweet_counts:
                 tweet_counts[tweet.screen_name] = 1
                 tweet.rank = tweet_counts[tweet.screen_name]
-                if tweet.category == 'A' and len(main_tweets) < 15:
+                if tweet.category == 'A' and len(main_tweets) < 5:
                     main_tweets.append(tweet)
-                elif tweet.category == 'B' and len(celeb_tweets) < 10:
+                elif tweet.category == 'B' and len(celeb_tweets) < 3:
                     celeb_tweets.append(tweet)
                 elif tweet.category in ['C', 'D', 'E']:
                     other_tweets.append(tweet)
@@ -63,11 +63,11 @@ with DB(env, datetime.datetime.now().strftime('%Y-%m-%d')) as db:
                         and tweet.score >= env.cutoff_b[tweet_counts[tweet.screen_name] - 1]):
                     tweets.append(tweet)
 
-    main_tweets.extend(tweets[:10])
+    main_tweets.extend(tweets[:3])
     main_tweets.extend(celeb_tweets)
-    main_tweets.extend(other_tweets[:5])
-    main_tweets.extend(foreign_tweets[:5])
-    main_tweets.extend(stranger_tweets[:5])
+    # main_tweets.extend(other_tweets[:5])
+    # main_tweets.extend(foreign_tweets[:5])
+    # main_tweets.extend(stranger_tweets[:5])
     print('{} tweets selected.'.format(len(main_tweets)))
 
     try:

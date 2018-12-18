@@ -119,6 +119,8 @@ class DB(DBUtil):
         self.range_min = None
         self.range_max = None
 
+        self._baseline_tweet_id = None
+
         self.date_skey_request = 0
         self.date_skey_dblookup = 0
         self.word_skey_request = 0
@@ -149,7 +151,7 @@ class DB(DBUtil):
         self.c.execute('ATTACH DATABASE ? AS dim', (dim_database,))
         self.c.execute('SELECT min_date from db_baseline')
         self.min_date = self.c.fetchone()[0]
-        if self.min_date != date and not (self.min_date < date and database == self.env.database):
+        if self.min_date > date:
             logger.critical("Could not find database for date %s", date)
             exit(1)
         # return self.c
@@ -209,9 +211,11 @@ class DB(DBUtil):
         return batch_id
 
     def get_baseline_tweet_id(self):
-        self.c.execute('SELECT min_tweet_id FROM db_baseline')
-        row = self.c.fetchone()
-        return row[0]
+        if self._baseline_tweet_id is None:
+            self.c.execute('SELECT min_tweet_id FROM db_baseline')
+            row = self.c.fetchone()
+            self._baseline_tweet_id = row[0]
+        return self._baseline_tweet_id
 
     def get_famous_screen_names(self):
         self.c.execute('select screen_name from dim_tweeter where category < ?', ('C',))

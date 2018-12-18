@@ -407,7 +407,7 @@ def main():
             tweet.posted_at = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         elif tweet.type == 'retweet':
             if tcount > 1:
-                time.sleep(env.TWEET_DELAY)
+                time.sleep(env.tweet_delay)
             result = dict()
             if env.post == 'post':
                 result = pub.retweet(tweet.tweet_id)
@@ -421,7 +421,7 @@ def main():
 
         else:
             if tcount > 1:
-                time.sleep(env.TWEET_DELAY)
+                time.sleep(env.tweet_delay)
             # weight_multiplier = 1
 
             action = tweet.type

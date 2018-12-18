@@ -37,6 +37,10 @@ class TwitterAPI:
             if e.message[0]['code'] == 110:
                 logger.warning(f'The user ({screen_name}) you are trying to remove from the list ({list_name}) is ' +
                                'not a member.')
+            elif e.message[0]['code'] == 108:
+                logger.warning(
+                    f'The user ({screen_name}) you are trying to remove from the list ({list_name}) does ' +
+                    'not exist.')
             else:
                 raise
 

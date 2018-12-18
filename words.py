@@ -6,7 +6,7 @@ import twitter
 
 import defaults
 import os.path
-from twitterstats.secommon import file_timestamp
+from twitterstats.secommon import file_timestamp, today
 from twitterstats.db import DB
 # from time import sleep
 
@@ -62,7 +62,7 @@ class Words:
 
         self.retweets = []
 
-        self.date = time.strftime('%Y-%m-%d', time.gmtime())
+        self.date = today()
         self.db = DB(environment, self.date)
         # self.c = self.db.connect(self.date)
         self.db_summary = DBSummary(environment)
@@ -459,7 +459,7 @@ class Words:
 
     # @timeout(7)
     def pull_data(self, list_name):
-        since_id = self.db.get_list_max_id(list_name)
+        since_id = self.db.get_baseline_tweet_id()
         max_id = None
         all_statuses = []
         statuses = None

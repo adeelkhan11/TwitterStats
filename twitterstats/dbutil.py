@@ -163,11 +163,12 @@ class DBUtil:
     @staticmethod
     def calculate_text_score(text, score_table):
         result = 0
-        words = re.split('[^A-Za-z]+', text.lower())
+        if text is not None:
+            words = re.split('[^A-Za-z]+', text.lower())
 
-        for n in words:
-            if n in score_table:
-                result += score_table[n]
+            for n in words:
+                if n in score_table:
+                    result += score_table[n]
 
         return result
 

@@ -129,6 +129,7 @@ def yesterday(relative_date=None):
 def yesterday_file(relative_date=None):
     yesterday(relative_date).replace('-', '_')
 
+
 def this_month():
     return datetime.now().strftime('%Y-%m')
 

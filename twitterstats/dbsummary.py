@@ -105,7 +105,7 @@ class DBSummary(DBUtil):
         results.extend(rows)
         t = ('pend-post', 'pend-rej', 'trends', 'mentions', 'trenders')
         self.c.execute(
-            'SELECT type, head, tail, image_head, date_nkey, period, status, tweet_id, account, background_image, t_id'
+            'SELECT t_id, type, head, tail, image_head, date_nkey, period, status, tweet_id, account, background_image'
             ' from tweet where status IN (?, ?) and type in (?, ?, ?) order by drafted_at LIMIT 10',
             t)
         rows = self.c.fetchall()
@@ -114,7 +114,19 @@ class DBSummary(DBUtil):
 
         tweets = list()
         for row in results:
-            tweet = PublishTweetWritable(*row, self)
+            t_id, ttype, head, tail, image_head, date_nkey, period, status, tweet_id, account, background_image = row
+            tweet = PublishTweetWritable(type=ttype,
+                                         head=head,
+                                         tail=tail,
+                                         image_head=image_head,
+                                         date_nkey=date_nkey,
+                                         period=period,
+                                         status=status,
+                                         tweet_id=tweet_id,
+                                         account=account,
+                                         background_image=background_image,
+                                         id=t_id,
+                                         db_summary=self)
             # tweet = {'t_id': row[0], 'type': row[1], 'head': row[2], 'tail': row[3],
             #          'image_head': row[4], 'date_nkey': row[5], 'period': row[6],
             #          'status': row[7], 'tweet_id': row[8], 'account': row[9],
