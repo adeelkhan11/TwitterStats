@@ -162,6 +162,18 @@ class DBSummary(DBUtil):
         self.c.execute('insert into retweets (tweet_id, account, retweeted_at) values (?, ?, ?)', t)
         self.commit()
 
+    def save_tweet_retweet(self, tweet, account, drafted_date):
+        status = 'pend-post'
+        score = f'{tweet.rank}: {tweet.score:.0f}/{tweet.bot_data_availability}'
+        t = (tweet.id, 'retweet', tweet.id, tweet.text, score,
+             tweet.screen_name, tweet.retweet_count, status,
+             tweet.created_at, drafted_date, account,
+             tweet.category)
+        self.c.execute('INSERT INTO tweet (t_id, type, tweet_id, head, tail, tweet_screen_name, ' +
+                       'tweet_retweet_count, status, tweet_created_at, drafted_at, ' +
+                       'account, tweeter_type) ' +
+                       'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', t)
+
     def save_tweet(self, tweet):
         t = (tweet['t_id'], tweet['type'], tweet['tweet_id'], tweet['head'], tweet['tail'],
              tweet['tweet_screen_name'], tweet['tweet_retweet_count'], tweet['status'],

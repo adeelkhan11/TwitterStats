@@ -19,7 +19,7 @@ args = parser.parse_args()
 with DB(env, datetime.datetime.now().strftime('%Y-%m-%d')) as db:
     db_summary = DBSummary(env)
 
-    start_date = (datetime.datetime.now() - timedelta(hours=24)).strftime(
+    start_date = (datetime.datetime.now() - timedelta(hours=10)).strftime(
         '%Y-%m-%d %H:%M:%S') if args.start_date == '' else args.start_date
     end_date = args.end_date
     print("Dates: {} ; {}".format(start_date, end_date))
@@ -63,26 +63,30 @@ with DB(env, datetime.datetime.now().strftime('%Y-%m-%d')) as db:
                         and tweet.score >= env.cutoff_b[tweet_counts[tweet.screen_name] - 1]):
                     tweets.append(tweet)
 
-    main_tweets.extend(tweets[:3])
-    main_tweets.extend(celeb_tweets)
+    main_tweets = main_tweets[:3]
+    # main_tweets.extend(tweets[:3])
+    main_tweets.extend(celeb_tweets[:1])
     # main_tweets.extend(other_tweets[:5])
     # main_tweets.extend(foreign_tweets[:5])
     # main_tweets.extend(stranger_tweets[:5])
     print('{} tweets selected.'.format(len(main_tweets)))
 
+    drafted_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     try:
         sorted_x = sorted(main_tweets, key=lambda x: x.id)
+        for tweet in sorted_x:
+            db_summary.save_tweet_retweet(tweet, env.default_account, drafted_date)
+        db.set_retweeted(sorted_x)
     except TypeError as e:
         for t in main_tweets:
             print(t)
         raise
 
-    drafted_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    db_summary.disconnect()
 
-    for tweet in sorted_x:
-        tweet.drafted_date = drafted_date
-        tweet.account = env.default_account
-
-    data = {'tweets': sorted_x}
-    Publisher.publish(env, data, 'draft')
-    db.set_retweeted(sorted_x)
+    # for tweet in sorted_x:
+    #     tweet.drafted_date = drafted_date
+    #     tweet.account = env.default_account
+    #
+    # data = {'tweets': sorted_x}
+    # Publisher.publish(env, data, 'draft')

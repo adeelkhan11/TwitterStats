@@ -21,9 +21,9 @@ class Environment:
         self.consumer_key = consumer_key
         self.consumer_secret = consumer_secret
 
-        self.cutoff_a = [125, 400, 800]
+        self.cutoff_a = [150, 400, 800]
         self.cutoff_b = [500, 1000]
-        self.cutoff_default = [500]
+        self.cutoff_default = [300]
 
         self.category_limit_c = 100
         self.category_limit_default = 300
