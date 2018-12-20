@@ -157,3 +157,9 @@ def get_db_filename(dbtype='se', date=None):
         logger.error('Database %s not found.', filename)
         filename = None
     return filename
+
+
+def chop(text, size):
+    if isinstance(text, str):
+        return text[:size]
+    return text

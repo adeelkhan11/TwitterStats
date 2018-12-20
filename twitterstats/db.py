@@ -6,7 +6,7 @@ from typing import List
 from twitterstats.dbutil import DBUtil
 from twitterstats import secommon
 # from twitterstats.singleton import Singleton
-from twitterstats.secommon import now, today
+from twitterstats.secommon import now, today, chop
 from twitterstats.urdu import urdu_to_english
 
 logger = logging.getLogger(__name__)
@@ -302,8 +302,8 @@ class DB(DBUtil):
         timezone_score = self.calculate_text_score(timezone, self.timezone_scores)
 
         logger.debug("Name:%3d   Category:%3d   Location:%3d   Timezone:%3d  %-20s %s %-15s %-15s" % (
-            name_score, category_score, location_score, timezone_score, name[:20], category, location[:15],
-            timezone[:15]))
+            name_score, category_score, location_score, timezone_score, chop(name, 20), category, chop(location, 15),
+            chop(timezone, 15)))
 
         return category_score + min(10, max(-5, name_score + location_score + timezone_score))
 
