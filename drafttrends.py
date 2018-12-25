@@ -3,7 +3,7 @@ import datetime
 import defaults
 from subprocess import call
 from twitterstats.db import DB
-from twitterstats.publisher import Publisher
+# from twitterstats.publisher import Publisher
 from twitterstats.secommon import today
 
 logger = logging.getLogger('drafttrends')
@@ -18,7 +18,7 @@ class DraftTrends:
 
         i = 0
         new_discovered = 0
-        while i < len(sorted_x) and sorted_x[i][1]['score'] >= 100:
+        while i < len(sorted_x) and sorted_x[i][1]['score'] >= 50:
             if sorted_x[i][1]['status'] == 'NONE' and len(sorted_x[i][0]) > 2:
                 logger.info('Calling ' + sorted_x[i][0])
                 call('python words.py ' + sorted_x[i][0], shell=True)
@@ -55,8 +55,8 @@ class DraftTrends:
                 trends.append(trend)
             i += 1
 
-        jdata = {'trends': trends}
-        Publisher.publish(environment, jdata, 'trends')
+        # jdata = {'trends': trends}
+        # Publisher.publish(environment, jdata, 'trends')
 
     def get_trends(self):
         rows = self.db.get_trends_relevance()

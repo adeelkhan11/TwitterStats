@@ -61,6 +61,9 @@ class TwitterAPI:
                 if e.message[0]['code'] == 104:
                     logger.error(f'Rate limit reached for adding user {screen_name} to list {list_name}.')
                     return e.message[0]['message']
+                if e.message[0]['code'] == 106:
+                    logger.error(f'Not allowed to add user {screen_name} to list {list_name}.')
+                    return e.message[0]['message']
                 if e.message[0]['code'] == 108:
                     logger.warning(f'Could not find user {screen_name} to add to list {list_name}.')
                     return e.message[0]['message']

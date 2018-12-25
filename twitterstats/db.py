@@ -171,7 +171,7 @@ class DB(DBUtil):
         self.commit()
 
     def get_top_tweets(self, start_date, end_date):
-        t = (start_date, end_date, self.env.cutoff_a[0], 'A', self.env.cutoff_b[0], 'G', self.env.cutoff_default[0])
+        t = (start_date, end_date, self.env.cutoff_a[0], 'A', self.env.cutoff_b[0], 'B')
         sql = """select t.id, t.created_at, t.screen_name,
         t.text, t.retweet_count, dt.category, t.retweet_count + (bot.bot_factor * 2) as score, bot.bot_data_availability
         from (
@@ -189,8 +189,8 @@ class DB(DBUtil):
         and bot.tweet_count > 1
         and t.retweet_id = 0
         and t.retweeted is null
-        and ((t.retweet_count >= ? and dt.category = ?) or (t.retweet_count >= ? and dt.category < ?)
-        or t.retweet_count > ?)
+        and ((t.retweet_count >= ? and dt.category = ?) 
+             or (t.retweet_count >= IFNULL(dt.rt_threshold, ?) and dt.category = ?))
         order by t.retweet_count + (bot.bot_factor * 2) desc LIMIT 1000
         ;
         """
