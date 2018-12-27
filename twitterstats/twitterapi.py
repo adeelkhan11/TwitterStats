@@ -22,7 +22,7 @@ class TwitterAPI:
                               consumer_secret=self.environment.consumer_secret,
                               access_token_key=token.key,
                               access_token_secret=token.secret,
-                              timeout=10)
+                              timeout=30)
             self.twitters.append(api)
 
     def polling_api(self):
