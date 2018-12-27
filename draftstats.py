@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import List
 
 import defaults
-import env
+# import env
 import operator
 import math
 import os
@@ -165,8 +165,7 @@ class Stats:
             # print
             i += 1
 
-        sorted_x = sorted_y
-        self.items = sorted_x
+        self.items = sorted_y
 
     def get_tweeter_details(self, screen_name):
         t = (screen_name,)
@@ -344,6 +343,7 @@ class Stats:
             item = DraftStatsTweetItem(rank=i + 1)
             if self.type != 'trends':
                 screen_name = self.items[i][0][0][0]
+                # logger.info(f'Screen name: {screen_name}')
                 score = self.items[i][1]
                 starcount = int(score / 25) if self.type == 'mentions' else int(score / 100)
                 # else:
@@ -403,6 +403,10 @@ class Stats:
             tweet.items.append(item)
             i += 1
         return tweet
+
+    # @staticmethod
+    # def check_trenders_tweet(tweet):
+    #     for
 
 
 def main():

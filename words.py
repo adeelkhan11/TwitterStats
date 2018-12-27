@@ -347,7 +347,7 @@ class Words:
         # remove links
         text = re.sub(r"(?<![A-Za-z0-9_])https?://[^ ,;'()\[\]<>{}]+", '', status_text, flags=re.IGNORECASE)
 
-        alist = re.split('[, .;\'\"(){\}\[\]<>:?/=+\\\-~`!#^&*\n]+', text)
+        alist = re.split('[, .;\'\"(){\}\[\]<>:?/=+\\\-`~!#^&*\n]+', text)
         tweetwords = list()
         for item in alist:
             nitem = item.strip(' ,.-+()[]:\'\"').lower()
@@ -357,7 +357,7 @@ class Words:
                 continue
             if nitem in self.boring_words:
                 continue
-            if nitem[:1] == '@' and len(nitem) > 1:
+            if nitem[:1] == '@' and len(nitem) > 2:
                 # Tweeter mentions
                 if tweeter not in self.data[status_date]['tweeter_mentions']:
                     self.data[status_date]['tweeter_mentions'][tweeter] = {}

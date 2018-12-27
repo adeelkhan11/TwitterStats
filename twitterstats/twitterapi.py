@@ -29,6 +29,9 @@ class TwitterAPI:
         return self.twitters[self.db_summary.polling_token_index]
 
     def remove_from_list(self, screen_name, list_name):
+        if list_name[:5] == 'ERROR':
+            return
+
         try:
             self.polling_api().DestroyListsMember(screen_name=screen_name,
                                                   slug=list_name.lower(),
@@ -43,6 +46,7 @@ class TwitterAPI:
                     f'The user ({screen_name}) you are trying to remove from the list ({list_name}) does ' +
                     'not exist.')
             else:
+                logger.error(f'Could not remove user ({screen_name}) from list ({list_name}).')
                 raise
 
     def add_to_list(self, screen_name, list_name):

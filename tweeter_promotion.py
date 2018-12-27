@@ -112,6 +112,7 @@ class Promotion:
 def main():
     env = defaults.get_environment()
     db = DB(env, today())
+    # db = DB(env, '2018-12-25')
     promotion = Promotion()
 
     demotedate_c = (datetime.date.today() - timedelta(days=30)).strftime('%Y-%m-%d')
@@ -125,6 +126,9 @@ def main():
     # If a person has more than POWER_TWEEP followers, then mark it as F if it is negative - cannot do it for all
     # tweeps because
     # would get too many category F's. Don't want to waste resources storing Tweeps we may never encounter in future.
+    logger.info(f'Starting loop of {len(rows)} records.')
+    row_count = len(rows)
+    current_row = 0
     for screen_name, pos, neg, blocked, category, relevance_score, followers_count, name, location, time_zone in rows:
         tweeter = promotion.add(screen_name=screen_name,
                                 name=name,
@@ -148,8 +152,12 @@ def main():
                 tweeter.adjust_score(2)
             elif pos > 1:
                 tweeter.adjust_score(1)
+        current_row += 1
+        if current_row % 100 == 0:
+            logger.info(f'{current_row:4d}/{row_count} {category} {screen_name}')
 
     # Promote top tweeps
+    logger.info('Promoting top tweeps.')
     db.c.execute('select screen_name from dim_tweeter where category <= ?', ('C',))
     rows = db.c.fetchall()
     famous = [row[0] for row in rows]
@@ -160,6 +168,7 @@ def main():
         tweeter = promotion.add(screen_name=screen_name)
         tweeter.adjust_score(1)
 
+    logger.info('Saving changes.')
     promotion.save_all()
 
     # Demote from D

@@ -750,6 +750,7 @@ class DB(DBUtil):
         from dim_tweeter
         where (category is null or category not in ('A', 'B', 'C', 'D'))
         and list is not null
+        and list not like 'ERROR%'
         order by category, category_date
         LIMIT 50"""
         self.c.execute(sql)
