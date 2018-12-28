@@ -16,6 +16,7 @@ import argparse
 
 from twitterstats.db import DB
 # from twitterstats.dbsummary import PublishTweet
+from twitterstats.dbsummary import DBSummary
 from twitterstats.publisher import Publisher
 from twitterstats.secommon import now
 from twitterstats.urdu import urdu_to_english
@@ -82,6 +83,7 @@ class DraftStatsTweetItem:
 
 @dataclass
 class DraftStatsTweet:
+    id: str
     type: str
     head: str
     tail: str
@@ -156,7 +158,7 @@ class Stats:
                 # else:
                 # logger.info(a)
                 if type == 'trends' and subindex <= 3 and (
-                        i < 11 or (i <= 20 and a.lower()[1:] in self.tag_history and y >= 700)):
+                        (i < 11 and subindex == 1) or (i <= 20 and a.lower()[1:] in self.tag_history and y >= 700)):
                     completeness = db.get_tag_completeness(a)
                     # print("Completeness for %s: %0.3f" % (a, completeness))
                     if completeness > 0.999:
@@ -318,6 +320,7 @@ class Stats:
         trend = self.trend if self.trend is not None else ''
 
         tweet = DraftStatsTweet(
+            id='{}-{}'.format(self.date, self.trend if self.type == 'trenders' else self.type),
             type=self.type,
             head={'mentions': "Top mentions " + showdate + ":\n",
                   'trends': "Trends " + showdate + ":\n",
@@ -335,7 +338,7 @@ class Stats:
             period=period,
             trend=self.trend,
             background_image=None,
-            status=None,
+            status='pend-post',
             tweet_id=None
         )
         i = 0
@@ -456,6 +459,7 @@ def main():
 
     environment = defaults.get_environment()
     db = DB(environment, args.date)
+    db_summary = DBSummary(environment)
 
     date_skey = db.get_date_skey(args.date)
 
@@ -475,14 +479,18 @@ def main():
                       actions[action_ind]['trend'] if action == 'trenders' else None)
 
         i = 100
+        is_tweetable = True
         if action == "trenders":
             tweet = stats.write_tweet(i)
             if not stats.is_trenders_tweet_postable(tweet):
-                tweet = None
+                is_tweetable = False
         elif action == "trends":
             tweet = stats.write_tweet(i)
         elif action == "mentions":
             tweet = stats.write_tweet(i)
+
+        if is_tweetable:
+            db_summary.save_tweet(tweet)
 
         if tweet is not None:
             tweets.append(tweet)
@@ -492,6 +500,8 @@ def main():
             tweets = list()
             time.sleep(10)
         action_ind += 1
+
+    db_summary.disconnect()
 
     # Now get app metrics
     rows = db.get_tweeter_category_counts()

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PublishTweetItem:
     rank: int
-    subrank: str
+    subrank: int
     score: str
     tweet_text: str
     display_image: str
@@ -174,26 +174,36 @@ class DBSummary(DBUtil):
                        'account, tweeter_type) ' +
                        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', t)
 
+    def delete_tweet_if_exists(self, tweet):
+        self.c.execute('DELETE FROM tweet WHERE t_id = ?', (tweet.id, ))
+        self.c.execute('DELETE FROM tweet_item WHERE t_id = ?', (tweet.id, ))
+
     def save_tweet(self, tweet):
-        t = (tweet['t_id'], tweet['type'], tweet['tweet_id'], tweet['head'], tweet['tail'],
-             tweet['tweet_screen_name'], tweet['tweet_retweet_count'], tweet['status'],
-             tweet['tweet_created_at'], tweet['drafted_at'], tweet['submitted_at'],
-             tweet['image_head'], tweet['date_nkey'], tweet['period'], tweet['account'],
-             tweet['tweeter_type'], tweet['trend'], tweet['background_image'])
+        self.delete_tweet_if_exists(tweet)
+
+        t = (tweet.id, tweet.type, tweet.tweet_id, tweet.head, tweet.tail,
+             tweet.tweet_screen_name, None, tweet.status,
+             None, tweet.drafted_at, now(),
+             tweet.image_head, tweet.date_nkey, tweet.period, tweet.account,
+             None, tweet.trend, tweet.background_image)
         self.c.execute('INSERT INTO tweet (t_id, type, tweet_id, head, tail, tweet_screen_name, ' +
                        'tweet_retweet_count, status, tweet_created_at, drafted_at, submitted_at, ' +
                        'image_head, date_nkey, period, account, tweeter_type, trend, background_image) ' +
                        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', t)
 
+        for item in tweet.items:
+            self.save_tweet_item(tweet, item)
+
     def save_tweet_item(self, tweet, item):
-        t = (
-            tweet['t_id'], item['rank'], item['subrank'], item['score'], item['tweet_text'],
-            item['display_image'],
-            item['display_text'], item['selected'])
-        self.c.execute(
-            """INSERT INTO tweet_item (t_id, rank, subrank, score, tweet_text, display_image, display_text, selected)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            t)
+        for sub_item in item.subitems:
+            t = (
+                tweet.id, item.rank, sub_item.subrank, sub_item.score, sub_item.tweet_text,
+                sub_item.display_image,
+                sub_item.display_text, 'Y')
+            self.c.execute(
+                """INSERT INTO tweet_item (t_id, rank, subrank, score, tweet_text, display_image, display_text, selected)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                t)
 
 
 @dataclass

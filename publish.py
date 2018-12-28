@@ -29,7 +29,7 @@ import os.path
 from twitterstats import urdu_reshaper
 from bidi.algorithm import get_display
 # from db import *`
-import urllib
+import urllib.request
 # import urllib2
 from templates import template_2017 as template
 # import httplib
@@ -64,15 +64,17 @@ class Publish:
         #     self.accounts[screen_name] = acc
 
     @staticmethod
-    def write_tweet(tweet, count, start=0):
-        result = ""
-        i = start
-        while i < len(tweet.items) and i < count:
-            if i > start:
-                result += "\n"
-            result += str(i + 1) + " " + tweet.items[i].tweet_text
-            i += 1
-        return tweet.head + result + tweet.tail
+    def write_tweet(tweet, count):
+        result = []
+        item_number = 1
+        for item in tweet.items:
+            # logger.info(f'{item.rank} {item.subrank} {item.tweet_text}')
+            if item.subrank is None or item.subrank == 1:
+                result.append(str(item_number) + " " + item.tweet_text)
+                item_number += 1
+            if item_number > count:
+                break
+        return tweet.head + '\n'.join(result) + tweet.tail
 
     def retweet(self, tweet_id):
         result = {'status': 'OK'}
@@ -106,6 +108,7 @@ class Publish:
                 img.paste(picr, (455, 125 + (listed * 60)))
         except:
             logger.error("Error loading image: " + picfile)
+            raise
 
     @staticmethod
     def resize_rect(rect, size):
@@ -227,7 +230,7 @@ class Publish:
 
         if dateimage is not None:
             image_url = dateimage
-        elif '|' in image_url:
+        elif image_url is not None and '|' in image_url:
             image_url, image_text = image_url.split('|')[:2]
 
         if image_url is not None and image_url != "":
@@ -362,8 +365,7 @@ class Publish:
                             pic = Image.open(picfile)
                         else:
                             file = io.BytesIO(urllib.request.urlopen(tweet.items[i].display_image,
-                                                                     timeout=10,
-                                                                     retries=2).read())
+                                                                     timeout=30).read())
                             # print "image:", tweet.items'][i]['display_image']
                             pic = Image.open(file)
                             pic.save(picfile)
