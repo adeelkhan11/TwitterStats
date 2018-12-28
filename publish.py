@@ -31,7 +31,7 @@ from bidi.algorithm import get_display
 # from db import *`
 import urllib.request
 # import urllib2
-from templates import template_2017 as template
+from templates import template_dev as template
 # import httplib
 import logging
 import twitter
@@ -431,7 +431,7 @@ def main():
             action = tweet.type
             i = 10
             tweet_text = pub.write_tweet(tweet, i)
-            while len(tweet_text) > 115 and i > 1:
+            while len(tweet_text) > 145 and i > 1:
                 i -= 1
                 tweet_text = pub.write_tweet(tweet, i)
 

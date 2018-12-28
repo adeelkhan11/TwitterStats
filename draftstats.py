@@ -160,7 +160,7 @@ class Stats:
                 if type == 'trends' and subindex <= 3 and (
                         (i < 11 and subindex == 1) or (i <= 20 and a.lower()[1:] in self.tag_history and y >= 700)):
                     completeness = db.get_tag_completeness(a)
-                    # print("Completeness for %s: %0.3f" % (a, completeness))
+                    print("Completeness for %s: %0.3f" % (a, completeness))
                     if completeness > 0.999:
                         actions.append({'type': 'trenders', 'trend': a[1:]})
             # if type != 'trenders':
@@ -416,7 +416,8 @@ class Stats:
         rejection_reasons = list()
         last_score = 0
         for i, item in enumerate(tweet.items):
-            last_score = item.subitems[0].score
+            if i < 20:
+                last_score = item.subitems[0].score
             if item.subitems[0].category == 'F':
                 foreign_accounts.append(item.subitems[0].display_text)
             elif item.subitems[0].category == 'R':

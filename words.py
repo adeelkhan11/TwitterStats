@@ -348,7 +348,7 @@ class Words:
         # remove links
         text = re.sub(r"(?<![A-Za-z0-9_])https?://[^ ,;'()\[\]<>{}]+", '', status_text, flags=re.IGNORECASE)
 
-        alist = re.split('[, .;\'\"(){\}\[\]<>:?/=+\\\-`~!#^&*\n]+', text)
+        alist = re.split('[, .;\'\"(){\}\[\]<>:?/=+\\\`~!#^&*\n\-]+', text)
         tweetwords = list()
         for item in alist:
             nitem = item.strip(' ,.-+()[]:\'\"').lower()
