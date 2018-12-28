@@ -404,9 +404,47 @@ class Stats:
             i += 1
         return tweet
 
-    # @staticmethod
-    # def check_trenders_tweet(tweet):
-    #     for
+    @staticmethod
+    def is_trenders_tweet_postable(tweet):
+        result = True
+        foreign_accounts = list()
+        top_3_bots = list()
+        all_bots = list()
+        rejection_reasons = list()
+        last_score = 0
+        for i, item in enumerate(tweet.items):
+            last_score = item.subitems[0].score
+            if item.subitems[0].category == 'F':
+                foreign_accounts.append(item.subitems[0].display_text)
+            elif item.subitems[0].category == 'R':
+                all_bots.append(item.subitems[0].display_text)
+                if i < 3:
+                    top_3_bots.append(item.subitems[0].display_text)
+
+        if len(foreign_accounts) > 1:
+            result = False
+            rejection_reasons.append('More than 1 foreign account ({})'.format(', '.join(foreign_accounts)))
+
+        if len(top_3_bots) > 1:
+            result = False
+            rejection_reasons.append('More than 1 bot in top 3 places ({})'.format(', '.join(top_3_bots)))
+
+        if len(all_bots) > 7:
+            result = False
+            rejection_reasons.append('More than 7 bots in top 20 places ({})'.format(', '.join(all_bots)))
+
+        if len(tweet.items) < 20:
+            result = False
+            rejection_reasons.append(f'{len(tweet.items)} items is less than 20')
+
+        if last_score < 50:
+            result = False
+            rejection_reasons.append(f'Last item score of {last_score} is less than 50')
+
+        if not result:
+            logger.info('Rejected stats for {}: [{}]'.format(tweet.trend, '; '.join(rejection_reasons)))
+
+        return result
 
 
 def main():
@@ -439,12 +477,15 @@ def main():
         i = 100
         if action == "trenders":
             tweet = stats.write_tweet(i)
+            if not stats.is_trenders_tweet_postable(tweet):
+                tweet = None
         elif action == "trends":
             tweet = stats.write_tweet(i)
         elif action == "mentions":
             tweet = stats.write_tweet(i)
 
-        tweets.append(tweet)
+        if tweet is not None:
+            tweets.append(tweet)
         if len(tweets) >= 2:
             data = {'tweets': tweets, 'date': args.date}
             Publisher.publish(environment, data, 'draft')
