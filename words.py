@@ -111,6 +111,7 @@ class Words:
             tags_list = []
             for tagdata in orig_tags_list:
                 tags_list.append(self.db.get_tag_ranges(tagdata['tag'], self.baseline_tweet_id))
+            print('Tags_list:', tags_list)
             self.pull_trends(tags_list)
         elif hashtag == 'home_timeline':
             status_count = self.pull_data(hashtag)

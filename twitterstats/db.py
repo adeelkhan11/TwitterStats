@@ -34,7 +34,7 @@ class Hashtag:
 
     def __post_init__(self):
         self.name_scores.append(NameScore())
-        self.state = 'AUTO_DEL'
+        self.state = ''
 
     def get_average_score(self, sample_size):
         total_score = sum([ns.total_score for ns in self.name_scores[-sample_size:]])
