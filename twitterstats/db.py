@@ -252,12 +252,16 @@ class DB(DBUtil):
         counter = 0
         for key, item in self.fact_status.items():
             # mark_database_activity()
-            self.c.execute("""
-                insert into fact_status
-                 (id, created_at, screen_name, text, tweeter_skey, retweet_count, in_reply_to_status_id, date_skey,
-                  retweet_id, retweet_created_at, retweet_screen_name, batch_id, english_words)
-                values (?,?,?,?,?,?,?,?,?,?,?,?,?)""", item)
-            counter += 1
+            try:
+                self.c.execute("""
+                    insert into fact_status
+                     (id, created_at, screen_name, text, tweeter_skey, retweet_count, in_reply_to_status_id, date_skey,
+                      retweet_id, retweet_created_at, retweet_screen_name, batch_id, english_words, source)
+                    values (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", item)
+                counter += 1
+            except sqlite3.InterfaceError:
+                logger.error(f'Could now write {item}')
+                raise
         logger.info("%i tweets written." % counter)
         self.fact_status = dict()
 
@@ -423,7 +427,7 @@ class DB(DBUtil):
         return self.date_skey_cache[date]
 
     def tweet_is_duplicate(self, id_, created_at, screen_name, text, tweeter_skey, retweet_count, in_reply_to_status_id,
-                           date_skey, retweet_id, retweet_created_at, retweet_screen_name, batch_id):
+                           date_skey, retweet_id, retweet_created_at, retweet_screen_name, batch_id, source):
         result = 1
         if id_ not in self.fact_status and id_ not in self.fact_status_retweet_count:
             t = (id_,)
@@ -432,7 +436,7 @@ class DB(DBUtil):
             if row is None:
                 self.fact_status[id_] = [id_, created_at, screen_name, text, tweeter_skey, retweet_count,
                                          in_reply_to_status_id, date_skey, retweet_id, retweet_created_at,
-                                         retweet_screen_name, batch_id, '']
+                                         retweet_screen_name, batch_id, '', source]
                 result = 0
             elif retweet_count != row[1]:
                 self.fact_status_retweet_count[id_] = retweet_count

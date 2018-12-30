@@ -146,7 +146,7 @@ class Words:
             while statuses is None or len(statuses) >= 50:
                 statuses = self.api.GetSearch(term=trend.name, result_type='recent', count=100,
                                               include_entities=False, max_id=max_id, since_id=since_id)
-                self.get_words(statuses, trend=trend)
+                self.get_words(statuses, trend=trend, source=trend.name)
                 status_count += len(statuses)
                 score = trend.get_average_score(10)
                 if len(statuses) > 0:
@@ -160,7 +160,7 @@ class Words:
                                                                         'None' if max_id is None else max_id,
                                                                         trend.get_status_count(10), score, trend.state))
 
-                if score < -1.0 and status_count > 100:
+                if score < 0.0 and status_count > 150:
                     trend.state = 'AUTO_DEL'
                     self.save_score_log(self.ns_score_log, trend.name, 'Negative')
                     id_range.min_id = max_id
@@ -348,7 +348,7 @@ class Words:
         # remove links
         text = re.sub(r"(?<![A-Za-z0-9_])https?://[^ ,;'()\[\]<>{}]+", '', status_text, flags=re.IGNORECASE)
 
-        alist = re.split('[, .;\'\"(){\}\[\]<>:?/=+\\\`~!#^&*\n\-]+', text)
+        alist = re.split('[, .;\'\"(){\}\[\]<>:?/=+\\\`~!#^&*\\r\\n\-]+', text)
         tweetwords = list()
         for item in alist:
             nitem = item.strip(' ,.-+()[]:\'\"').lower()
@@ -390,7 +390,7 @@ class Words:
             [self.db.get_word_skey(x, self.date)[1] for x in sorted(set(tweetwords))]) + u'~'
         self.db.update_tweet_words(status_id, tweet_words_text)
 
-    def get_words(self, statuses, trend=None):
+    def get_words(self, statuses, trend=None, source=None):
         # max_id = 0
         # min_id = MAX_STATUS_ID
         for status in statuses:
@@ -449,7 +449,8 @@ class Words:
                                           retweet_id=retweet_id,
                                           retweet_created_at=retweet_created_at,
                                           retweet_screen_name=retweet_screen_name,
-                                          batch_id=self.batch_id):
+                                          batch_id=self.batch_id,
+                                          source=source):
                 self.t_skip += 1
                 continue
 
@@ -480,7 +481,7 @@ class Words:
                     include_entities=False)
 
             if len(statuses) > 0:
-                self.get_words(statuses)
+                self.get_words(statuses, source=list_name)
                 all_statuses.extend(statuses)
                 max_id = statuses[-1].id - 1
                 logger.info('{}  {}'.format(statuses[-1].id, len(statuses)))
