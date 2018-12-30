@@ -148,7 +148,7 @@ class Words:
                                               include_entities=False, max_id=max_id, since_id=since_id)
                 self.get_words(statuses, trend=trend)
                 status_count += len(statuses)
-                score = trend.get_average_score(6)
+                score = trend.get_average_score(10)
                 if len(statuses) > 0:
                     max_id = statuses[-1].id - 1
                 if id_range.max_id is None and len(statuses) > 0:
@@ -160,13 +160,13 @@ class Words:
                                                                         'None' if max_id is None else max_id,
                                                                         trend.get_status_count(10), score, trend.state))
 
-                if score < -1.5 and status_count > 100:
+                if score < -1.0 and status_count > 100:
                     trend.state = 'AUTO_DEL'
                     self.save_score_log(self.ns_score_log, trend.name, 'Negative')
                     id_range.min_id = max_id
                     return request_count, status_count
 
-                if score < 0.0 and status_count > 2500:
+                if score < 0.5 and status_count > 1000:
                     trend.state = 'AUTO_DEL'
                     self.save_score_log(self.ns_score_log, trend.name, 'Hot_Ambiguous')
                     id_range.min_id = max_id
