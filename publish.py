@@ -195,9 +195,9 @@ class Publish:
 
     def draw_tweet(self, tweet, star_weight):
         global img_resized
-        font = ImageFont.truetype("/Library/Fonts/Arial Unicode.ttf", 50)
-        fontb = ImageFont.truetype("/Library/Fonts/Arial Unicode.ttf", 40)
-        font_image_caption = ImageFont.truetype("/Library/Fonts/Arial Unicode.ttf", 35)
+        font = ImageFont.truetype("fonts/Arial Unicode.ttf", 50)
+        fontb = ImageFont.truetype("fonts/Arial Unicode.ttf", 40)
+        font_image_caption = ImageFont.truetype("fonts/Arial Unicode.ttf", 35)
         starw = Image.open("images/start40.png")
         starg = Image.open("images/start40g.png")
         starr = Image.open("images/start40red.png")
