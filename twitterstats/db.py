@@ -745,7 +745,7 @@ class DB(DBUtil):
         where category in ('A', 'B', 'C', 'D')
         and (list is null or (list not like category || '%' and list not like 'ERROR%'))
         order by category, category_date
-        LIMIT 50"""
+        LIMIT 100"""
         self.c.execute(sql)
         return self.c.fetchall()
 
@@ -756,7 +756,7 @@ class DB(DBUtil):
         and list is not null
         and list not like 'ERROR%'
         order by category, category_date
-        LIMIT 50"""
+        LIMIT 100"""
         self.c.execute(sql)
         return self.c.fetchall()
 
