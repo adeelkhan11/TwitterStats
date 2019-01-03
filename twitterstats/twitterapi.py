@@ -3,6 +3,9 @@ from time import sleep
 
 import twitter
 from twitter import TwitterError
+import ssl
+
+ssl._create_default_https_context = ssl._create_unverified_context
 
 logger = logging.getLogger(__name__)
 
