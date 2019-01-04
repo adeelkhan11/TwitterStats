@@ -38,7 +38,7 @@ import twitter
 # from fileinput import filename
 
 from twitterstats.dbsummary import DBSummary
-from twitterstats.publisher import Publisher
+# from twitterstats.publisher import Publisher
 
 # from twitterstats.secommon import now
 
@@ -402,7 +402,7 @@ def main():
                               access_token_secret=token.secret)
 
     pub = Publish(env, db_summary, twitter_api)
-    tweetbucket = list()
+    # tweetbucket = list()
     tcount = 0
     for tweet in tweets:
         tcount += 1
@@ -453,16 +453,16 @@ def main():
 
         tweet.save_status()
 
-        tweetbucket.append(tweet)
-        if len(tweetbucket) >= 3:
-            data = {'tweets': tweetbucket}
-            Publisher.publish(env, data, 'posted')
-            tweetbucket = list()
-            time.sleep(10)
+        # tweetbucket.append(tweet)
+        # if len(tweetbucket) >= 3:
+        #     data = {'tweets': tweetbucket}
+        #     Publisher.publish(env, data, 'posted')
+        #     tweetbucket = list()
+        #     time.sleep(10)
 
-    if len(tweetbucket) > 0:
-        data = {'tweets': tweetbucket}
-        Publisher.publish(env, data, 'posted')
+    # if len(tweetbucket) > 0:
+    #     data = {'tweets': tweetbucket}
+    #     Publisher.publish(env, data, 'posted')
 
     db_summary.disconnect()
 

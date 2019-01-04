@@ -21,7 +21,7 @@ class DraftTrends:
         while i < len(sorted_x) and sorted_x[i][1]['score'] >= 100:
             if sorted_x[i][1]['status'] == 'NONE' and len(sorted_x[i][0]) > 2:
                 logger.info('Calling ' + sorted_x[i][0])
-                call('python words.py ' + sorted_x[i][0], shell=True)
+                call('python3.7 words.py ' + sorted_x[i][0], shell=True)
                 new_discovered += 1
                 if new_discovered >= 12:
                     break

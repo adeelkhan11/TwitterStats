@@ -6,7 +6,7 @@ import datetime
 import argparse
 
 # Gets the list of tweets to retweet with stats
-from twitterstats.publisher import Publisher
+# from twitterstats.publisher import Publisher
 
 env = defaults.get_environment()
 
