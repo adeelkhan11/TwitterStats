@@ -1,46 +1,26 @@
 # This version uses backup pic if error obtaining profile pic
 # 2014-04-03 Switched to urdu_reshaper
-# import twitter
-# from secommon import *
+import twitter
 from twitter import TwitterError
 
 import defaults
-# import oauth2 as oauth
-# import json
-# import sqlite3
-# import sys
-# import operator
-# import math
-# import PIL
 import re
 import os
 import fnmatch
 import time
 import datetime
-# from datetime import date, timedelta
 from PIL import ImageFont
 from PIL import Image
 from PIL import ImageDraw
-# from twython import Twython
-# import StringIO
-# import urllib, cStringIO
 import io
 import os.path
 from twitterstats import urdu_reshaper
 from bidi.algorithm import get_display
-# from db import *`
 import urllib.request
-# import urllib2
-from templates import template_dev as template
-# import httplib
+from templates import template_2017 as template
 import logging
-import twitter
-# from fileinput import filename
 
 from twitterstats.dbsummary import DBSummary
-# from twitterstats.publisher import Publisher
-
-# from twitterstats.secommon import now
 
 logger = logging.getLogger('publish')
 
