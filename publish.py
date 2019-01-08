@@ -218,8 +218,11 @@ class Publish:
                 if os.path.exists("images/custom/%s" % image_url):
                     pic2 = Image.open("images/custom/%s" % image_url)
                 else:
-                    file = io.BytesIO(urllib.request.urlopen(image_url, timeout=30).read())
-                    pic2 = Image.open(file)
+                    if os.path.isfile(image_url):
+                        pic2 = Image.open(image_url)
+                    else:
+                        file = io.BytesIO(urllib.request.urlopen(image_url, timeout=30).read())
+                        pic2 = Image.open(file)
                 pic = pic2.point(lambda p: p * 0.7)
                 # pWidth, pHeight = pic.size
 
