@@ -96,10 +96,10 @@ class Publish:
 
         if x < y:
             nx = size
-            ny = y * nx / x
+            ny = y * nx // x
         else:
             ny = size
-            nx = x * ny / y
+            nx = x * ny // y
 
         return nx, ny
 
@@ -125,7 +125,7 @@ class Publish:
             max_width = max(w, max_width)
             max_height = max(h, max_height)
 
-        x_center = position_top_right[0] - (max_width / 2)
+        x_center = position_top_right[0] - (max_width // 2)
         while True:
             for i, word in enumerate(words):
                 if (i < len(words) - 1
@@ -148,7 +148,7 @@ class Publish:
 
         for i, line in enumerate(new_words):
             self.print_text(line,
-                            (x_center - new_widths[i] / 2, position_top_right[1] + i * max_height),
+                            (x_center - new_widths[i] // 2, position_top_right[1] + i * max_height),
                             colour,
                             draw,
                             font,
@@ -228,7 +228,7 @@ class Publish:
 
                 new_size = self.resize_rect(pic.size, 680)
                 picr = pic.resize(new_size, Image.ANTIALIAS)
-                img.paste(picr, (width - ((680 + new_size[0]) / 2), 100 - ((new_size[1] - 680) / 2)))
+                img.paste(picr, (width - ((680 + new_size[0]) // 2), 100 - ((new_size[1] - 680) // 2)))
 
                 if image_text is not None:
                     self.print_text_box(image_text, (width - 16, 100), template.IMAGE_CAPTION_COLOUR, draw,
@@ -305,10 +305,10 @@ class Publish:
             # 		except AssertionError:
             # 			print "Unable to display trends: ", newtext
 
-            starcount = int(score / star_weight)
+            starcount = int(score // star_weight)
             distance = 35
-            redstars = int(starcount / 25)
-            goldstars = int((starcount % 25) / 5)
+            redstars = int(starcount // 25)
+            goldstars = int((starcount % 25) // 5)
             whitestars = starcount % 5
 
             # Shadows
