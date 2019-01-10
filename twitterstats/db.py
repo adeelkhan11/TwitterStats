@@ -46,6 +46,9 @@ class Hashtag:
     def get_status_count(self, sample_size):
         return sum([ns.status_count for ns in self.name_scores[-sample_size:]])
 
+    def get_total_score(self, sample_size):
+        return sum([ns.total_score for ns in self.name_scores[-sample_size:]])
+
     @property
     def state(self) -> str:
         if self._state == '':
@@ -286,9 +289,15 @@ class DB(DBUtil):
                 # mark_database_activity()
                 if id_range.max_id is not None and id_range.processed:
                     t = (trend.name, now(), id_range.max_id, id_range.min_id)
-                    self.c.execute('insert into tag_history (tag, date, max_id, min_id) values (?,?,?,?)', t)
+                    self.c.execute("""insert into tag_history (tag, date, max_id, min_id)
+                        values (?,?,?,?)""", t)
                     # print "tag_history: %25s,%20s,%20d,%20d" % item
                     counter += 1
+
+            self.write_tag_score(tag=trend.name,
+                                 tweet_count=sum([ns.status_count for ns in trend.name_scores]),
+                                 score=sum([ns.total_score for ns in trend.name_scores]),
+                                 max_id=trend.ranges[-1].max_id)
         logger.info("%i tag histories written." % counter)
         self.tag_history = list()
 

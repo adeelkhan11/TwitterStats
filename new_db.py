@@ -78,7 +78,7 @@ class NewDB:
         sql = """select {}
             from tag_score
             where score_time >= ?"""
-        t = (date,)
+        t = (three_days_ago,)
         db_copy.copy_table('tag_score', sql, t)
 
         # FACT_DAILY_FOLLOWERS
