@@ -19,6 +19,16 @@ class NameScore:
 
 
 @dataclass
+class Command:
+    id: int
+    screen_name: str
+    created_at: str
+    text: str
+    processed_date: str = None
+    status: str = None
+
+
+@dataclass
 class Range:
     min_id: int
     max_id: int
@@ -31,10 +41,12 @@ class Hashtag:
     ranges: List[Range] = field(default_factory=list)
     name_scores: List[NameScore] = field(default_factory=list)
     _state: str = ''
+    updated_date: str = ''
 
     def __post_init__(self):
         self.name_scores.append(NameScore())
         self.state = ''
+        self.updated_date = now()
 
     def get_average_score(self, sample_size):
         total_score = sum([ns.total_score for ns in self.name_scores[-sample_size:]])
@@ -52,11 +64,11 @@ class Hashtag:
     @property
     def state(self) -> str:
         if self._state == '':
-            state = DB.db.get_trends().get(self.name, None)
+            state = DB.db.get_trends().get(self.name.lower(), None)
             if state is None:
                 state = 'AUTO_DEL'
-                DB.db.set_trend(self.name, state)
-                DB.db.get_trends()[self.name] = state
+                DB.db.set_trend(self.name.lower(), state, self.updated_date)
+                DB.db.get_trends()[self.name.lower()] = state
             self._state = state
 
         return self._state
@@ -65,8 +77,8 @@ class Hashtag:
     def state(self, v: str):
         if v != self.state:
             self._state = v
-            DB.db.set_trend(self.name, v)
-            DB.db.get_trends()[self.name] = v
+            DB.db.set_trend(self.name.lower(), v, self.updated_date)
+            DB.db.get_trends()[self.name.lower()] = v
 
 
 # @dataclass_json
@@ -320,6 +332,18 @@ class DB(DBUtil):
 
         return category_score + min(10, max(-5, name_score + location_score + timezone_score))
 
+    def get_commands(self, screen_names):
+        sql = """select fs.id, fs.screen_name, fs.created_at, fs.text
+            from fact_status fs
+            join dim_tweeter dt
+            on fs.tweeter_skey = dt.tweeter_skey
+            where dt.screen_name_lower in ({})
+            and fs.id > ?""".format(
+                ', '.join([f"'{sn.lower()}'" for sn in screen_names]))
+
+        self.c.execute(sql, (self.get_baseline_tweet_id(), ))
+        return [Command(*row) for row in self.c.fetchall()]
+
     def get_tag_ranges(self, tag, min_override):
         # tag is a word with preceding hash
         result = Hashtag(name=tag)
@@ -347,6 +371,10 @@ class DB(DBUtil):
 
         if prev_min is None or prev_min > min_override:
             result.ranges.append(Range(min_id=min_override, max_id=prev_min))
+
+        self.c.execute('SELECT tweet_count, score FROM tag_score where tag = ? order by max_id', t)
+        result.name_scores = [NameScore(*row) for row in self.c.fetchall()]
+        result.name_scores.append(NameScore())
 
         return result
 
@@ -399,10 +427,10 @@ class DB(DBUtil):
 
         return result
 
-    def set_trend(self, trend, result):
-        t = (trend, now())
+    def set_trend(self, trend, result, discovery_time):
+        t = (trend, discovery_time)
         self.c.execute('DELETE FROM tag_discovery WHERE tag = ? AND discovery_time = ?', t)
-        t = (trend, result, now())
+        t = (trend, result, discovery_time)
         self.c.execute('INSERT INTO tag_discovery (tag, result, discovery_time) VALUES (?, ?, ?)', t)
 
     def load_name_score_data(self):

@@ -87,6 +87,15 @@ class DBSummary(DBUtil):
 
         return _tokens
 
+    def get_account_screen_names(self):
+        return [t['name'] for t in self.tokens]
+
+    def get_processed_commands(self, since_id):
+        sql = """SELECT id FROM commands WHERE id > ?"""
+        self.c.execute(sql, (since_id, ))
+        result = self.c.fetchall()
+        return frozenset([r[0] for r in result])
+
     def get_tweet_status(self, t_id):
         t = (t_id,)
         self.c.execute('SELECT status FROM tweet WHERE t_id = ?', t)
@@ -177,6 +186,18 @@ class DBSummary(DBUtil):
     def delete_tweet_if_exists(self, tweet):
         self.c.execute('DELETE FROM tweet WHERE t_id = ?', (tweet.id, ))
         self.c.execute('DELETE FROM tweet_item WHERE t_id = ?', (tweet.id, ))
+
+    def save_command(self, command):
+        sql = "INSERT INTO commands (id, screen_name, created_at, text, processed_date, status) " \
+              "VALUES (?, ?, ?, ?, ?, ?)"
+        t = (command.id,
+             command.screen_name,
+             command.created_at,
+             command.text,
+             command.processed_date,
+             command.status)
+
+        self.c.execute(sql, t)
 
     def save_tweet(self, tweet):
         self.delete_tweet_if_exists(tweet)
