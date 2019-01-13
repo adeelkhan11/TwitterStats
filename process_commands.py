@@ -1,4 +1,5 @@
 import logging
+import re
 
 from twitter import TwitterError
 
@@ -11,6 +12,20 @@ from subprocess import call
 from twitterstats.twitterapi import TwitterAPI
 
 logger = logging.getLogger('process_commands')
+
+
+def save_command(command, status_text, db_summary, polling_api):
+    logger.info(f'{command.id}: {status_text}')
+    try:
+        polling_api.PostUpdate(status_text,
+                               in_reply_to_status_id=command.id,
+                               auto_populate_reply_metadata=True)
+    except TwitterError as e:
+        logger.error(e.message)
+    command.status = status_text
+    command.processed_date = now()
+    db_summary.save_command(command)
+    db_summary.commit()
 
 
 def main():
@@ -33,7 +48,19 @@ def main():
         if command.id in processed_commands:
             logger.info(f'Skipping {command.id}. Already processed: {command.text}')
         else:
-            if command.text.lower()[:5] == 'add #':
+            m = re.match('\+([a-zA-Z0-9_]+) ([A-Z])( ([0-9]+))?', command.text)
+            if m:
+                screen_name = m.group(1)
+                category = m.group(2)
+                rt_threshold = m.group(4)
+
+                db.set_tweeter_category(screen_name=screen_name,
+                                        category=category,
+                                        rt_threshold=rt_threshold)
+
+                status_text = f'+{screen_name} set to {category} {rt_threshold}'
+                save_command(command, status_text, db_summary, api.polling_api())
+            elif command.text.lower()[:5] == 'add #':
                 tag_name = command.text[5:]
                 logger.info(f'Adding {tag_name}')
                 call('python3.7 words.py ' + tag_name, shell=True)
@@ -45,17 +72,7 @@ def main():
                                                        name_score.total_score / max(name_score.status_count, 1)
                                                        ) if name_score is not None else ''
                 status_text = f'-{tag_name} added. {score_text} {tag.state}'
-                logger.info(f'{command.id}: {status_text}')
-                try:
-                    api.polling_api().PostUpdate(status_text,
-                                                 in_reply_to_status_id=command.id,
-                                                 auto_populate_reply_metadata=True)
-                except TwitterError as e:
-                    logger.error(e.message)
-                command.status = status_text
-                command.processed_date = now()
-                db_summary.save_command(command)
-                db_summary.commit()
+                save_command(command, status_text, db_summary, api.polling_api())
             else:
                 logger.info(f'Unknown command {command.id}: {command.text}')
 

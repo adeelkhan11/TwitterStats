@@ -1091,15 +1091,18 @@ class DB(DBUtil):
         self.c.execute('UPDATE dim_word SET generic = ? where word = ?',
                        (generic, word.lower()))
 
-    def set_tweeter_category(self, screen_name, category, relevance_score=None):
+    def set_tweeter_category(self, screen_name, category, relevance_score=None, rt_threshold=None):
         if relevance_score is None:
-            t = (category, today(), screen_name.lower())
-            self.c.execute('UPDATE dim_tweeter set category = ?, category_date = ? WHERE screen_name_lower = ?', t)
+            t = (category, rt_threshold, today(), screen_name.lower())
+            self.c.execute("""UPDATE dim_tweeter
+                set category = ?, rt_threshold = ?, category_date = ?
+                WHERE screen_name_lower = ?""", t)
         else:
-            t = (category, today(), relevance_score, screen_name)
+            t = (category, today(), relevance_score, screen_name.lower())
             self.c.execute(
-                "update dim_tweeter set category = ?, category_date = ?, relevance_score = ? WHERE screen_name = ?",
-                t)
+                """update dim_tweeter
+                set category = ?, category_date = ?, relevance_score = ?
+                WHERE screen_name_lower = ?""", t)
 
     def set_tweeter_category_by_date(self, date_category_was_set, current_category, new_category):
         t = (new_category, today(), current_category, date_category_was_set)
