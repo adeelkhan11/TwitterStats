@@ -45,7 +45,7 @@ class Hashtag:
 
     def __post_init__(self):
         self.name_scores.append(NameScore())
-        self.state = ''
+        self._state = ''
         self.updated_date = now()
 
     def get_average_score(self, sample_size):

@@ -3,19 +3,14 @@ import logging
 from twitter import TwitterError
 
 import defaults
-from datetime import timedelta
-import datetime
 from twitterstats.db import DB
 from twitterstats.dbsummary import DBSummary
-from twitterstats.publisher import Publisher
-from twitterstats.secommon import today, now, nvl
-from twitterstats.secommon import yesterday
-from twitterstats.secommon import yesterday_file
+from twitterstats.secommon import today, now
 from subprocess import call
 
 from twitterstats.twitterapi import TwitterAPI
 
-logger = logging.getLogger('getpending')
+logger = logging.getLogger('process_commands')
 
 
 def main():
@@ -50,10 +45,11 @@ def main():
                                                        name_score.total_score / max(name_score.status_count, 1)
                                                        ) if name_score is not None else ''
                 status_text = f'-{tag_name} added. {score_text} {tag.state}'
-                logger.info(status_text)
+                logger.info(f'{command.id}: {status_text}')
                 try:
                     api.polling_api().PostUpdate(status_text,
-                                                 in_reply_to_status_id=command.id)
+                                                 in_reply_to_status_id=command.id,
+                                                 auto_populate_reply_metadata=True)
                 except TwitterError as e:
                     logger.error(e.message)
                 command.status = status_text
