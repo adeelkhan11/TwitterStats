@@ -74,7 +74,8 @@ def main():
                 status_text = f'-{tag_name} added. {score_text} {tag.state}'
                 save_command(command, status_text, db_summary, api.polling_api())
             else:
-                logger.info(f'Unknown command {command.id}: {command.text}')
+                if command.text[:2] not in ('To', 'RT'):
+                    logger.info(f'Unknown command {command.id}: {command.text}')
 
     db_summary.disconnect()
     db.disconnect()
