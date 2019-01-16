@@ -204,7 +204,7 @@ class DB(DBUtil):
         and bot.tweet_count > 1
         and t.retweet_id = 0
         and t.retweeted is null
-        and ((t.retweet_count >= ? and dt.category = ?) 
+        and ((t.retweet_count >= IFNULL(dt.rt_threshold, ?) and dt.category = ?) 
              or (t.retweet_count >= IFNULL(dt.rt_threshold, ?) and dt.category = ?))
         order by t.retweet_count + (bot.bot_factor * 2) desc LIMIT 1000
         ;

@@ -65,7 +65,7 @@ with DB(env, datetime.datetime.now().strftime('%Y-%m-%d')) as db:
 
     main_tweets = main_tweets[:3]
     # main_tweets.extend(tweets[:3])
-    main_tweets.extend(celeb_tweets[:1])
+    main_tweets.extend(celeb_tweets[:2])
     # main_tweets.extend(other_tweets[:5])
     # main_tweets.extend(foreign_tweets[:5])
     # main_tweets.extend(stranger_tweets[:5])
