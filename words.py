@@ -194,7 +194,7 @@ class Words:
             total_request_count += request_count
             total_status_count += status_count
             self.db.tag_history.append(trend)
-            if total_request_count >= last_write + 3:
+            if total_request_count >= last_write + 20:
                 self.write_data()
                 self.batch_id += 1
                 last_write = total_request_count
