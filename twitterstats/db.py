@@ -734,7 +734,11 @@ class DB(DBUtil):
 
     def write_tag_score(self, tag, tweet_count, score, max_id):
         t = (tag, tweet_count, score, max_id, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        self.c.execute('insert into tag_score (tag, tweet_count, score, max_id, score_time) values (?,?,?,?,?)', t)
+        try:
+            self.c.execute('insert into tag_score (tag, tweet_count, score, max_id, score_time) values (?,?,?,?,?)', t)
+        except OverflowError:
+            logger.error('Could not insert values: {}'.format(';'.join(str(v) for v in t)))
+            raise
 
     def get_word_skey(self, word, date):
         # mark_database_activity()
