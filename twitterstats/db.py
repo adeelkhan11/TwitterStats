@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 class NameScore:
     status_count: int = 0
     total_score: int = 0
+    new_score: bool = True  # To differentiate between scores loaded from history and new scores that are calculated
 
 
 @dataclass
@@ -308,13 +309,14 @@ class DB(DBUtil):
 
             try:
                 self.write_tag_score(tag=trend.name,
-                                     tweet_count=sum([ns.status_count for ns in trend.name_scores]),
-                                     score=sum([ns.total_score for ns in trend.name_scores]),
+                                     tweet_count=sum([ns.status_count for ns in trend.name_scores if ns.new_score]),
+                                     score=sum([ns.total_score for ns in trend.name_scores if ns.new_score]),
                                      max_id=trend.ranges[-1].max_id)
             except OverflowError:
                 logger.error(f'Error saving tag score for {trend.name}')
                 for ns in trend.name_scores:
                     logger.error(ns)
+                raise
         logger.info("%i tag histories written." % counter)
         self.tag_history = list()
 
@@ -378,7 +380,7 @@ class DB(DBUtil):
             result.ranges.append(Range(min_id=min_override, max_id=prev_min))
 
         self.c.execute('SELECT tweet_count, score FROM tag_score where tag = ? order by max_id', t)
-        result.name_scores = [NameScore(*row) for row in self.c.fetchall()]
+        result.name_scores = [NameScore(*row, False) for row in self.c.fetchall()]
         result.name_scores.append(NameScore())
 
         return result
