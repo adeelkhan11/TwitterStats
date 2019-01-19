@@ -306,10 +306,15 @@ class DB(DBUtil):
                     # print "tag_history: %25s,%20s,%20d,%20d" % item
                     counter += 1
 
-            self.write_tag_score(tag=trend.name,
-                                 tweet_count=sum([ns.status_count for ns in trend.name_scores]),
-                                 score=sum([ns.total_score for ns in trend.name_scores]),
-                                 max_id=trend.ranges[-1].max_id)
+            try:
+                self.write_tag_score(tag=trend.name,
+                                     tweet_count=sum([ns.status_count for ns in trend.name_scores]),
+                                     score=sum([ns.total_score for ns in trend.name_scores]),
+                                     max_id=trend.ranges[-1].max_id)
+            except OverflowError:
+                logger.error(f'Error saving tag score for {trend.name}')
+                for ns in trend.name_scores:
+                    logger.error(ns)
         logger.info("%i tag histories written." % counter)
         self.tag_history = list()
 
