@@ -1,13 +1,14 @@
 import argparse
 import re
 import time
+from time import sleep
 
 import twitter
 
 import defaults
 import os.path
 from twitterstats.secommon import file_timestamp, today
-from twitterstats.db import DB
+from twitterstats.db import DB, Range
 # from time import sleep
 
 from twitterstats.dbsummary import DBSummary
@@ -138,66 +139,87 @@ class Words:
         self.ns_score_log = []
         status_count = 0
         request_count = 0
-        for id_range in trend.ranges:
-            max_id = id_range.max_id
-            since_id = id_range.min_id
-            statuses = None
-            logger.info('Range: {:35} {:20} {:20}'.format(trend.name, since_id, 'None' if max_id is None else max_id))
-            while statuses is None or len(statuses) >= 50:
-                statuses = self.api.GetSearch(term=trend.name, result_type='recent', count=100,
-                                              include_entities=False, max_id=max_id, since_id=since_id)
-                self.get_words(statuses, trend=trend, source=trend.name)
-                status_count += len(statuses)
-                score = trend.get_average_score(10)
-                if len(statuses) > 0:
-                    max_id = statuses[-1].id - 1
-                if id_range.max_id is None and len(statuses) > 0:
-                    id_range.max_id = statuses[0].id
-                id_range.processed = True
-                request_count += 1
+        index = 0
+        while index < len(trend.ranges):
+            # for id_range in trend.ranges:
+            id_range = trend.ranges[index]
+            if not id_range.processed:
+                max_id = id_range.max_id
+                since_id = id_range.min_id
+                statuses = None
+                logger.info(
+                    'Range: {:35} {:20} {:20}'.format(trend.name, since_id, 'None' if max_id is None else max_id))
+                while statuses is None or len(statuses) >= 50:
+                    if request_count >= 100:
+                        new_range = Range(min_id=since_id, max_id=max_id)
+                        id_range.min_id = max_id
+                        trend.ranges.insert(index + 1, new_range)
+                        return request_count, status_count, False
 
-                logger.info('{:40}  {:20} {:20} {:5} {:5.2f} {}'.format(trend.name, since_id,
-                                                                        'None' if max_id is None else max_id,
-                                                                        trend.get_status_count(10), score, trend.state))
+                    statuses = self.api.GetSearch(term=trend.name, result_type='recent', count=100,
+                                                  include_entities=False, max_id=max_id, since_id=since_id)
+                    self.get_words(statuses, trend=trend, source=trend.name)
+                    status_count += len(statuses)
+                    score = trend.get_average_score(10)
+                    if len(statuses) > 0:
+                        max_id = statuses[-1].id - 1
+                    if id_range.max_id is None and len(statuses) > 0:
+                        id_range.max_id = statuses[0].id
+                    id_range.processed = True
+                    request_count += 1
 
-                if score < 0.0 and status_count > 150:
-                    trend.state = 'AUTO_DEL'
-                    self.save_score_log(self.ns_score_log, trend.name, 'Negative')
-                    id_range.min_id = max_id
-                    return request_count, status_count
+                    logger.info('{:40}  {:20} {:20} {:3} {:5} {:5.2f} {}'.format(trend.name, since_id,
+                                                                                 'None' if max_id is None else max_id,
+                                                                                 request_count,
+                                                                                 trend.get_status_count(10), score,
+                                                                                 trend.state))
 
-                if score < 0.5 and status_count > 1000:
-                    trend.state = 'AUTO_DEL'
-                    self.save_score_log(self.ns_score_log, trend.name, 'Hot_Ambiguous')
-                    id_range.min_id = max_id
-                    return request_count, status_count
+                    if score < 0.0 and status_count > 150:
+                        trend.state = 'AUTO_DEL'
+                        self.save_score_log(self.ns_score_log, trend.name, 'Negative')
+                        id_range.min_id = max_id
+                        return request_count, status_count, True
 
-                if score > 2.0:
-                    if trend.state not in ('AUTO_ADD', 'MAN_ADD'):
-                        trend.state = 'AUTO_ADD'
+                    if score < 0.5 and status_count > 1000:
+                        trend.state = 'AUTO_DEL'
+                        self.save_score_log(self.ns_score_log, trend.name, 'Hot_Ambiguous')
+                        id_range.min_id = max_id
+                        return request_count, status_count, True
 
-                # after 500 tweets if we still haven't got an indication, give up
-                if trend.get_status_count(10) > 500 and trend.state == 'AUTO_DEL':
-                    self.save_score_log(self.ns_score_log, trend.name, 'Ambiguous')
-                    id_range.min_id = max_id
-                    return request_count, status_count
+                    if score > 2.0:
+                        if trend.state not in ('AUTO_ADD', 'MAN_ADD'):
+                            trend.state = 'AUTO_ADD'
 
-        return request_count, status_count
+                    # after 500 tweets if we still haven't got an indication, give up
+                    if trend.get_status_count(10) > 500 and trend.state == 'AUTO_DEL':
+                        self.save_score_log(self.ns_score_log, trend.name, 'Ambiguous')
+                        id_range.min_id = max_id
+                        return request_count, status_count, True
+
+                    # Not needed for raspberry pi
+                    # if request_count % 100 == 0:
+                    #     logger.info(f'Sleeping 20 seconds at {request_count} requests.')
+                    #     sleep(20)
+            index += 1
+
+        return request_count, status_count, True
 
     def pull_trends(self, trends):
         total_status_count = 0
         last_write = 0
         total_request_count = 0
         for trend in trends:
-            request_count, status_count = self.pull_trend(trend)
-
-            total_request_count += request_count
-            total_status_count += status_count
-            self.db.tag_history.append(trend)
-            if total_request_count >= last_write + 20:
-                self.write_data()
-                self.batch_id += 1
-                last_write = total_request_count
+            completed = False
+            while not completed:
+                request_count, status_count, completed = self.pull_trend(trend)
+                logger.info(f'{request_count}  {status_count}  {completed}')
+                total_request_count += request_count
+                total_status_count += status_count
+                self.db.tag_history.append(trend)
+                if total_request_count >= last_write + 20:
+                    self.write_data()
+                    self.batch_id += 1
+                    last_write = total_request_count
         return total_status_count
 
     def load_metadata(self):

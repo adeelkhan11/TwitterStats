@@ -34,6 +34,7 @@ class Range:
     min_id: int
     max_id: int
     processed: bool = False
+    saved: bool = False
 
 
 @dataclass
@@ -300,18 +301,23 @@ class DB(DBUtil):
         for trend in self.tag_history:
             for id_range in trend.ranges:
                 # mark_database_activity()
-                if id_range.max_id is not None and id_range.processed:
+                if id_range.max_id is not None and id_range.processed and not id_range.saved:
                     t = (trend.name, now(), id_range.max_id, id_range.min_id)
                     self.c.execute("""insert into tag_history (tag, date, max_id, min_id)
                         values (?,?,?,?)""", t)
                     # print "tag_history: %25s,%20s,%20d,%20d" % item
                     counter += 1
+                    id_range.saved = True
 
             try:
                 self.write_tag_score(tag=trend.name,
                                      tweet_count=sum([ns.status_count for ns in trend.name_scores if ns.new_score]),
                                      score=sum([ns.total_score for ns in trend.name_scores if ns.new_score]),
                                      max_id=trend.ranges[-1].max_id)
+                for ns in trend.name_scores:
+                    if ns.new_score:
+                        ns.new_score = False
+                trend.name_scores.append(NameScore())
             except OverflowError:
                 logger.error(f'Error saving tag score for {trend.name}')
                 for ns in trend.name_scores:
