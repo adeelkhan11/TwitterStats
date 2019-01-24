@@ -212,7 +212,6 @@ class Words:
             completed = False
             while not completed:
                 request_count, status_count, completed = self.pull_trend(trend)
-                logger.info(f'{request_count}  {status_count}  {completed}')
                 total_request_count += request_count
                 total_status_count += status_count
                 self.db.tag_history.append(trend)
