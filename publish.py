@@ -65,7 +65,7 @@ class Publish:
             raise
         except TwitterError as e:
             result = {'status': 'TwitterError',
-                      'Message': 'Error {}: {}'.format(e.message[0]['code'], e.message[0]['message'])}
+                      'message': 'Error {}: {}'.format(e.message[0]['code'], e.message[0]['message'])}
             logger.warning('Error {}: {}'.format(e.message[0]['code'], e.message[0]['message']))
         else:
             logger.info('Retweeted %s' % tweet_id)
