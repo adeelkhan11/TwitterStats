@@ -178,8 +178,9 @@ class DB(DBUtil):
         return self.c.fetchall()
 
     def mark_tweeter_as_bot(self, screen_name):
-        t = ('R', self.min_date, -2, screen_name)
-        self.c.execute('UPDATE dim_tweeter set category = ?, category_date = ?, bot_score = ? WHERE screen_name = ?', t)
+        t = ('R', self.min_date, -2, screen_name.lower())
+        self.c.execute('UPDATE dim_tweeter set category = ?, category_date = ?, bot_score = ? ' +
+                       'WHERE screen_name_lower = ?', t)
 
     def set_retweeted(self, tweets):
         for tweet in tweets:
@@ -245,12 +246,12 @@ class DB(DBUtil):
         return int(row[0]) + 1
 
     def set_read_sequence(self, screen_name, read_sequence):
-        t = (read_sequence, screen_name)
-        self.c.execute('update dim_tweeter set read_sequence = ? where screen_name = ?', t)
+        t = (read_sequence, screen_name.lower())
+        self.c.execute('update dim_tweeter set read_sequence = ? where screen_name_lower = ?', t)
 
     def set_tweeter_error(self, screen_name, error):
-        t = (error, screen_name)
-        self.c.execute('update dim_tweeter set error = ? where screen_name = ?', t)
+        t = (error, screen_name.lower())
+        self.c.execute('update dim_tweeter set error = ? where screen_name_lower = ?', t)
 
     def get_next_screen_names_for_category(self, category, limit):
         t = (category + '%', limit)
@@ -817,8 +818,8 @@ class DB(DBUtil):
     def add_to_list(self, screen_name, list_name):
         sql = """update dim_tweeter
         set list = ?
-        where screen_name = ?"""
-        t = (list_name, screen_name)
+        where screen_name_lower = ?"""
+        t = (list_name, screen_name.lower())
         self.c.execute(sql, t)
 
     def remove_from_list(self, screen_name):
@@ -866,8 +867,8 @@ class DB(DBUtil):
     def get_tweeter_relevance_score(self, screen_name):
         sql = """SELECT name, category, relevance_score, location, time_zone, followers_count
             FROM dim_tweeter
-            WHERE screen_name = ?"""
-        t = (screen_name, )
+            WHERE screen_name_lower = ?"""
+        t = (screen_name.lower(), )
         self.c.execute(sql, t)
         result = self.c.fetchone()
         return result
