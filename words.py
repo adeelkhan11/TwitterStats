@@ -1,6 +1,6 @@
 import argparse
 import re
-import time
+# import time
 from time import sleep
 
 import twitter
@@ -114,6 +114,7 @@ class Words:
                 tags_list.append(self.db.get_tag_ranges(tagdata['tag'], self.baseline_tweet_id))
             print('Tags_list:', tags_list)
             self.pull_trends(tags_list)
+            self.write_data()
         elif hashtag == 'home_timeline':
             status_count = self.pull_data(hashtag)
             logger.info('{} statuses pulled.'.format(status_count))
@@ -135,7 +136,7 @@ class Words:
             self.current_token = 0
         return self.twitters[self.current_token]
 
-    def pull_trend(self, trend):
+    def pull_trend(self, trend, trend_count, trend_position):
         self.ns_score_log = []
         status_count = 0
         request_count = 0
@@ -148,7 +149,9 @@ class Words:
                 since_id = id_range.min_id
                 statuses = None
                 logger.info(
-                    'Range: {:35} {:20} {:20}'.format(trend.name, since_id, 'None' if max_id is None else max_id))
+                    'Range: {:>9} {:35} {:20} {:20}'.format(
+                        '{:4d}/{:4d}'.format(trend_position, trend_count),
+                        trend.name, since_id, 'None' if max_id is None else max_id))
                 while statuses is None or len(statuses) >= 50:
                     if request_count >= 100:
                         new_range = Range(min_id=since_id, max_id=max_id)
@@ -197,9 +200,9 @@ class Words:
                         return request_count, status_count, True
 
                     # Not needed for raspberry pi
-                    # if request_count % 100 == 0:
-                    #     logger.info(f'Sleeping 20 seconds at {request_count} requests.')
-                    #     sleep(20)
+                    if request_count % 100 == 0:
+                        logger.info(f'Sleeping 20 seconds at {request_count} requests.')
+                        sleep(20)
             index += 1
 
         return request_count, status_count, True
@@ -208,10 +211,11 @@ class Words:
         total_status_count = 0
         last_write = 0
         total_request_count = 0
-        for trend in trends:
+        trend_count = len(trends)
+        for i, trend in enumerate(trends):
             completed = False
             while not completed:
-                request_count, status_count, completed = self.pull_trend(trend)
+                request_count, status_count, completed = self.pull_trend(trend, trend_count, i + 1)
                 total_request_count += request_count
                 total_status_count += status_count
                 self.db.tag_history.append(trend)
