@@ -43,7 +43,7 @@ t2 = BashOperator(
     bash_command='cd {};{} tweeter_promotion.py'.format(python_script_path, python_executable),
     dag=dag)
 
-t3 = BashOperator(
+hu = BashOperator(
     task_id='hashtag_update',
     bash_command='cd {};{} hashtag_update.py'.format(python_script_path, python_executable),
     dag=dag,
@@ -59,8 +59,18 @@ t5 = BashOperator(
     bash_command='cd {};{} findbots_behaviour.py'.format(python_script_path, python_executable),
     dag=dag)
 
-t6 = BashOperator(
-    task_id='drafttrends',
+dt1 = BashOperator(
+    task_id='drafttrends1',
+    bash_command='cd {};{} drafttrends.py'.format(python_script_path, python_executable),
+    dag=dag)
+
+dt2 = BashOperator(
+    task_id='drafttrends2',
+    bash_command='cd {};{} drafttrends.py'.format(python_script_path, python_executable),
+    dag=dag)
+
+dt3 = BashOperator(
+    task_id='drafttrends3',
     bash_command='cd {};{} drafttrends.py'.format(python_script_path, python_executable),
     dag=dag)
 
@@ -77,4 +87,4 @@ t8 = BashOperator(
     dag=dag)
 
 
-t1 >> t2 >> t3 >> t4 >> t5 >> t6 >> t7 >> t8
+t1 >> dt1 >> dt2 >> dt3 >> hu >> t2 >> t4 >> t5 >> t7 >> t8
