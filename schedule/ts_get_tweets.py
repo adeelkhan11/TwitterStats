@@ -28,7 +28,7 @@ default_args = {
 dag = DAG(
     'ats_get_tweets',
     default_args=default_args,
-    schedule_interval='10,30,50 * * * *',
+    schedule_interval='10,30,50 2-23 * * *',
     catchup=False)
 
 python_executable = '~/venv/bin/python3.7'
@@ -63,4 +63,9 @@ t4 = BashOperator(
     dag=dag,
     trigger_rule=TriggerRule.ALL_DONE)
 
-latest_only >> t1 >> t2 >> t3 >> t4
+t5 = BashOperator(
+    task_id='process_commands',
+    bash_command='cd {};{} process_commands.py'.format(python_script_path, python_executable),
+    dag=dag)
+
+latest_only >> t1 >> t2 >> t3 >> t4 >> t5
