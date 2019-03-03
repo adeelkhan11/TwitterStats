@@ -50,7 +50,9 @@ t1 = BashOperator(
 t2 = BashOperator(
     task_id='words_lists',
     bash_command='cd {};{} words.py lists'.format(python_script_path, python_executable),
-    dag=dag)
+    dag=dag,
+    trigger_rule=TriggerRule.ALL_DONE,
+    execution_timeout=timedelta(minutes=15))
 
 t3 = BashOperator(
     task_id='draft_top_tweets',
@@ -61,11 +63,13 @@ t4 = BashOperator(
     task_id='publish',
     bash_command='cd {};{} publish.py'.format(python_script_path, python_executable),
     dag=dag,
-    trigger_rule=TriggerRule.ALL_DONE)
+    trigger_rule=TriggerRule.ALL_DONE,
+    execution_timeout=timedelta(minutes=15))
 
 t5 = BashOperator(
     task_id='process_commands',
     bash_command='cd {};{} process_commands.py'.format(python_script_path, python_executable),
-    dag=dag)
+    dag=dag,
+    trigger_rule=TriggerRule.ALL_DONE)
 
 latest_only >> t1 >> t2 >> t3 >> t4 >> t5
