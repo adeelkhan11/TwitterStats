@@ -5,7 +5,7 @@ https://github.com/apache/incubator-airflow/blob/master/airflow/example_dags/tut
 from airflow import DAG
 from airflow.operators.bash_operator import BashOperator
 from datetime import datetime, timedelta
-from airflow.utils.trigger_rule import TriggerRule
+# from airflow.utils.trigger_rule import TriggerRule
 
 
 default_args = {
@@ -46,8 +46,7 @@ t2 = BashOperator(
 hu = BashOperator(
     task_id='hashtag_update',
     bash_command='cd {};{} hashtag_update.py'.format(python_script_path, python_executable),
-    dag=dag,
-    trigger_rule=TriggerRule.ALL_DONE)
+    dag=dag)
 
 t4 = BashOperator(
     task_id='findbots',
