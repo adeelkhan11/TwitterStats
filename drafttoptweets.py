@@ -63,7 +63,9 @@ class TopTweets:
     # If tweep has already reached daily limit then unpublish the lowest RT tweet
     def retweet_supersede(self, tweet):
         if self.get_todays_retweet_count(tweet.screen_name) >= self.db.get_daily_retweet_limit(tweet.screen_name):
-            self.db_summary.save_tweet_posted_status(self._todays_retweets[tweet.screen_name][-1].id, 'pend-unpost')
+            self.db_summary.save_tweet_posted_status(
+                f'{self._todays_retweets[tweet.screen_name][-1].id}-{self.db.env.default_account}',
+                'pend-unpost')
 
     def _get_todays_retweets(self):
         retweet_ids = self.db_summary.get_selected_for_retweet_since_id(self.db.get_baseline_tweet_id(),

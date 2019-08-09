@@ -181,7 +181,8 @@ class DBSummary(DBUtil):
         return tweets
 
     def save_tweet_posted_status(self, _id, status):
-        t = (status, now(), f'{_id}-{self.env.default_account}', self.env.default_account)
+        # Pass in the ID (tweet_id-account) rather than just the tweet_id.
+        t = (status, now(), _id, self.env.default_account)
         self.c.execute('UPDATE tweet set status = ?, posted_at = ? where t_id = ? and account = ?', t)
         self.commit()
 
