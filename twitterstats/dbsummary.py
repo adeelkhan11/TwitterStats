@@ -43,14 +43,30 @@ class DBSummary(DBUtil):
         self.polling_token_index = -1
         self.load_tokens()
 
+    def not_selected_for_retweet(self, retweet_id):
+        t = (self.env.default_account, retweet_id, 'posted', 'pend-post')
+        self.c.execute('select tweet_id from tweet where account = ? and tweet_id = ? and status in (?, ?)', t)
+        t = self.c.fetchone()
+        if t is None:
+            return 1
+        else:
+            return 0
+
     def not_retweeted(self, retweet_id):
-        t = ('PakPolStats', retweet_id)
+        t = (self.env.default_account, retweet_id)
         self.c.execute('select tweet_id from retweets where account = ? and tweet_id = ?', t)
         t = self.c.fetchone()
         if t is None:
             return 1
         else:
             return 0
+
+    def get_selected_for_retweet_since_id(self, since_id, since_date):
+        t = (self.env.default_account, since_id, since_date, 'retweet', 'posted', 'pend-post')
+        self.c.execute("""select tweet_id from tweet where account = ? and tweet_id >= ? and tweet_created_at >= ?
+        and type = ? and status in (?, ?)""", t)
+        rows = self.c.fetchall()
+        return [row[0] for row in rows]
 
     # Tokens
     def load_tokens(self):
@@ -104,17 +120,19 @@ class DBSummary(DBUtil):
 
     def get_pending_tweets(self):
         results = list()
-        t = ('pend-post', 'pend-rej', 'retweet')
+        t = ('pend-post', 'pend-rej', 'pend-unpost', 'retweet')
         self.c.execute(
-            'SELECT t_id, type, head, tail, image_head, date_nkey, period, status, tweet_id, account, background_image'
-            ' from tweet where status IN (?, ?) and type in (?) order by tweet_id LIMIT 3',
+            'SELECT t_id, type, head, tail, image_head, date_nkey, period, status, tweet_id, account'
+            ', background_image, retweet_id'
+            ' from tweet where status IN (?, ?, ?) and type in (?) order by tweet_id LIMIT 3',
             t)
         rows = self.c.fetchall()
         logger.info('%d retweets', len(rows))
         results.extend(rows)
         t = ('pend-post', 'pend-rej', 'trends', 'mentions', 'trenders')
         self.c.execute(
-            'SELECT t_id, type, head, tail, image_head, date_nkey, period, status, tweet_id, account, background_image'
+            'SELECT t_id, type, head, tail, image_head, date_nkey, period, status, tweet_id, account'
+            ', background_image, retweet_id'
             ' from tweet where status IN (?, ?) and type in (?, ?, ?) order by drafted_at LIMIT 10',
             t)
         rows = self.c.fetchall()
@@ -123,7 +141,7 @@ class DBSummary(DBUtil):
 
         tweets = list()
         for row in results:
-            t_id, ttype, head, tail, image_head, date_nkey, period, status, tweet_id, account, background_image = row
+            t_id, ttype, head, tail, image_head, date_nkey, period, status, tweet_id, account, background_image, retweet_id = row
             tweet = PublishTweetWritable(type=ttype,
                                          head=head,
                                          tail=tail,
@@ -135,6 +153,7 @@ class DBSummary(DBUtil):
                                          account=account,
                                          background_image=background_image,
                                          id=t_id,
+                                         retweet_id=retweet_id,
                                          db_summary=self)
             # tweet = {'t_id': row[0], 'type': row[1], 'head': row[2], 'tail': row[3],
             #          'image_head': row[4], 'date_nkey': row[5], 'period': row[6],
@@ -162,8 +181,8 @@ class DBSummary(DBUtil):
         return tweets
 
     def save_tweet_posted_status(self, _id, status):
-        t = (status, now(), _id)
-        self.c.execute('UPDATE tweet set status = ?, posted_at = ? where t_id = ?', t)
+        t = (status, now(), f'{_id}-{self.env.default_account}', self.env.default_account)
+        self.c.execute('UPDATE tweet set status = ?, posted_at = ? where t_id = ? and account = ?', t)
         self.commit()
 
     def save_retweet(self, tweet_id):
@@ -171,10 +190,15 @@ class DBSummary(DBUtil):
         self.c.execute('insert into retweets (tweet_id, account, retweeted_at) values (?, ?, ?)', t)
         self.commit()
 
+    def save_tweet_retweet_id(self, tweet_id, retweet_id):
+        t = (retweet_id, f'{tweet_id}-{self.env.default_account}')
+        self.c.execute('update tweet set retweet_id = ? where t_id = ?', t)
+        self.commit()
+
     def save_tweet_retweet(self, tweet, account, drafted_date):
         status = 'pend-post'
         score = f'{tweet.rank}: {tweet.score:.0f}/{tweet.bot_data_availability}'
-        t = (tweet.id, 'retweet', tweet.id, tweet.text, score,
+        t = (f'{tweet.id}-{account}', 'retweet', tweet.id, tweet.text, score,
              tweet.screen_name, tweet.retweet_count, status,
              tweet.created_at, drafted_date, account,
              tweet.category)
@@ -184,8 +208,8 @@ class DBSummary(DBUtil):
                        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', t)
 
     def delete_tweet_if_exists(self, tweet):
-        self.c.execute('DELETE FROM tweet WHERE t_id = ?', (tweet.id, ))
-        self.c.execute('DELETE FROM tweet_item WHERE t_id = ?', (tweet.id, ))
+        self.c.execute('DELETE FROM tweet WHERE t_id = ?', (f'{tweet.id}-{tweet.account}', ))
+        self.c.execute('DELETE FROM tweet_item WHERE t_id = ?', (f'{tweet.id}-{tweet.account}', ))
 
     def save_command(self, command):
         sql = "INSERT INTO commands (id, screen_name, created_at, text, processed_date, status) " \
@@ -202,7 +226,7 @@ class DBSummary(DBUtil):
     def save_tweet(self, tweet):
         self.delete_tweet_if_exists(tweet)
 
-        t = (tweet.id, tweet.type, tweet.tweet_id, tweet.head, tweet.tail,
+        t = (f'{tweet.id}-{tweet.account}', tweet.type, tweet.tweet_id, tweet.head, tweet.tail,
              tweet.tweet_screen_name, None, tweet.status,
              None, tweet.drafted_at, now(),
              tweet.image_head, tweet.date_nkey, tweet.period, tweet.account,
@@ -218,7 +242,7 @@ class DBSummary(DBUtil):
     def save_tweet_item(self, tweet, item):
         for sub_item in item.subitems:
             t = (
-                tweet.id, item.rank, sub_item.subrank, sub_item.score, sub_item.tweet_text,
+                f'{tweet.id}-{tweet.account}', item.rank, sub_item.subrank, sub_item.score, sub_item.tweet_text,
                 sub_item.display_image,
                 sub_item.display_text, 'Y')
             self.c.execute(
@@ -237,6 +261,7 @@ class PublishTweet:
     period: str
     status: str
     tweet_id: str
+    retweet_id: str
     account: str
     background_image: str
     tweet_screen_name: str = None
@@ -253,6 +278,8 @@ class PublishTweet:
             result['status'] = self.status
         if self.tweet_id is not None:
             result['tweet_id'] = self.tweet_id
+        if self.retweet_id is not None:
+            result['retweet_id'] = self.retweet_id
         if self.background_image is not None:
             result['background_image'] = self.background_image
         if self.tweet_screen_name is not None:

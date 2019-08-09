@@ -5,6 +5,7 @@ Created on 18 Sep 2018
 """
 
 # import sqlite3
+import datetime
 import os
 import logging
 # import oauth2 as oauth
@@ -24,6 +25,7 @@ class DBUtil:
 
     # c = None
     # conn = None
+    DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 
     def __init__(self, environment):
         """
@@ -90,6 +92,14 @@ class DBUtil:
         self.c.execute(sql, tuple(values))
         result = self.c.fetchone()
         return result[0] > 0
+
+    @classmethod
+    def to_datetime(cls, text):
+        return datetime.datetime.strptime(text, cls.DATETIME_FORMAT)
+
+    @classmethod
+    def datetime_to_str(cls, dt):
+        return dt.strftime(cls.DATETIME_FORMAT)
 
     @staticmethod
     def get_dict_key(my_dict, keys):

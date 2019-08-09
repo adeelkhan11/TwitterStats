@@ -133,6 +133,7 @@ class DB(DBUtil):
         self.sn_categories = None
 
         self.min_date = None
+        self._now_time = None
         self.range_min = None
         self.range_max = None
 
@@ -149,6 +150,7 @@ class DB(DBUtil):
         self.tweeter_skey_cache = {}
 
         self.rated_tweeters = {}
+        self._daily_retweet_limit = {}
 
         self.connect(date)
 
@@ -177,6 +179,14 @@ class DB(DBUtil):
         self.c.execute(sql, t)
         return self.c.fetchall()
 
+    def now(self):
+        if self._now_time is None:
+            self.c.execute('SELECT max(created_at) created_at FROM fact_status')
+            row = self.c.fetchone()
+            if row is not None and row[0] is not None:
+                self._now_time = self.to_datetime(row[0])
+        return self._now_time
+
     def mark_tweeter_as_bot(self, screen_name):
         t = ('R', self.min_date, -2, screen_name.lower())
         self.c.execute('UPDATE dim_tweeter set category = ?, category_date = ?, bot_score = ? ' +
@@ -187,6 +197,24 @@ class DB(DBUtil):
             t = ('Y', tweet.id)
             self.c.execute('update fact_status set retweeted = ? where id = ?', t)
         self.commit()
+
+    def get_daily_retweet_limit(self, screen_name):
+        if screen_name not in self._daily_retweet_limit:
+            t = (screen_name.lower(), )
+            sql = """select rt_daily_limit, category from dim_tweeter where screen_name_lower = ?"""
+            self.c.execute(sql, t)
+            row = self.c.fetchone()
+            rt_daily_limit, category = row
+            if rt_daily_limit is None:
+                if category == 'A':
+                    rt_daily_limit = 3
+                elif category == 'B':
+                    rt_daily_limit = 2
+                else:
+                    rt_daily_limit = 1
+            self._daily_retweet_limit[screen_name] = rt_daily_limit
+
+        return self._daily_retweet_limit[screen_name]
 
     def get_top_tweets(self, start_date, end_date):
         t = (start_date, end_date, self.env.cutoff_a[0], 'A', self.env.cutoff_b[0], 'B')
@@ -261,6 +289,26 @@ class DB(DBUtil):
             where category like ? and error is null order by ifnull(read_sequence, 0) limit ?""",
             t)
         return [row[0] for row in self.c.fetchall()]
+
+    def get_tweet_by_id(self, tweet_id):
+        sql = """select s.id, s.created_at, s.screen_name, s.text, s.retweet_count, t.category
+            from fact_status s join dim_tweeter t on lower(s.screen_name) = t.screen_name_lower
+            where s.id = ?"""
+
+        self.c.execute(sql, (tweet_id, ))
+        row = self.c.fetchone()
+        if row is None:
+            print(f'Tweet {tweet_id} not found.')
+            return None
+        return Tweet(*row)
+
+    def get_tweets_by_ids(self, tweet_ids):
+        tweets = list()
+        for tid in tweet_ids:
+            t = self.get_tweet_by_id(tid)
+            if t is not None:
+                tweets.append(t)
+        return tweets
 
     def delete_batch(self, batch_id):
         t = (batch_id,)

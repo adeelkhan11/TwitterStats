@@ -56,10 +56,15 @@ class Publish:
                 break
         return tweet.head + '\n'.join(result) + tweet.tail
 
-    def retweet(self, tweet_id):
+    def retweet(self, tweet):
         result = {'status': 'OK'}
         try:
-            self.twitter_api.PostRetweet(tweet_id)
+            if tweet.status == 'pend-post':
+                t = self.twitter_api.PostRetweet(tweet.tweet_id)
+                self.db_summary.save_tweet_retweet_id(tweet.tweet_id, t.id)
+            elif tweet.status == 'pend-unpost':
+                if tweet.retweet_id is not None:
+                    self.twitter_api.DestroyStatus(tweet.retweet_id)
         except ConnectionError:
             print('Connection error.')
             raise
@@ -68,8 +73,8 @@ class Publish:
                       'message': 'Error {}: {}'.format(e.message[0]['code'], e.message[0]['message'])}
             logger.warning('Error {}: {}'.format(e.message[0]['code'], e.message[0]['message']))
         else:
-            logger.info('Retweeted %s' % tweet_id)
-            self.db_summary.save_retweet(tweet_id)
+            logger.info('Retweeted %s' % tweet.tweet_id)
+            self.db_summary.save_retweet(tweet.tweet_id)
 
         return result
 
@@ -340,6 +345,7 @@ class Publish:
                 # i += 1
                 # continue
                 if tweet.items[i].display_image is not None:
+                    picfile = ''
                     try:
                         m = re.search('(\.[^.]+)$', tweet.items[i].display_image)
                         picfile = "profiles/" + tweet.items[i].tweet_text[1:] + m.group(1)
@@ -397,13 +403,17 @@ def main():
                 time.sleep(env.tweet_delay)
             result = dict()
             if env.post == 'post':
-                result = pub.retweet(tweet.tweet_id)
+                result = pub.retweet(tweet)
+
             else:
-                logger.debug('Tweet %s not posted due to env setting.', tweet.tweet_id)
+                logger.info('Tweet %s not posted due to env setting.', tweet.tweet_id)
             if 'status' in result and result['status'] != 'OK':
                 tweet.status = result['message']
             else:
-                tweet.status = 'posted'
+                if tweet.status == 'pend-unpost':
+                    tweet.status = 'unposted'
+                else:
+                    tweet.status = 'posted'
             tweet.posted_at = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         else:
