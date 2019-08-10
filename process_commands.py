@@ -48,17 +48,23 @@ def main():
         if command.id in processed_commands:
             logger.info(f'Skipping {command.id}. Already processed: {command.text}')
         else:
-            m = re.match('\+([a-zA-Z0-9_]+) ([A-Z])( ([0-9]+))?', command.text)
+            m = re.match('\+([a-zA-Z0-9_]+) ([A-Z])( t ([0-9]+))?( dl ([0-9]+))?', command.text)
             if m:
                 screen_name = m.group(1)
                 category = m.group(2)
                 rt_threshold = m.group(4)
+                rt_daily_limit = m.group(6)
 
                 db.set_tweeter_category(screen_name=screen_name,
                                         category=category,
-                                        rt_threshold=rt_threshold)
+                                        rt_threshold=rt_threshold,
+                                        rt_daily_limit=rt_daily_limit)
 
-                status_text = f'+{screen_name} set to {category} {rt_threshold}'
+                status_text = f'+{screen_name} set to {category}'
+                if rt_threshold is not None:
+                    status_text += f' rt threshold {rt_threshold}'
+                if rt_daily_limit is not None:
+                    status_text += f' dl {rt_daily_limit}'
                 save_command(command, status_text, db_summary, api.polling_api())
             elif command.text.lower()[:5] == 'add #':
                 tag_name = command.text[5:]
