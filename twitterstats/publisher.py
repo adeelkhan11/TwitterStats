@@ -26,14 +26,14 @@ class Publisher:
                   'account': account}
         print(values)
         data = urllib.parse.urlencode(values).encode('utf-8')
-        response = urllib.request.urlopen(url, data, timeout=30)
+        response = urllib.request.urlopen(url, data, timeout=60)
         the_page = response.read()
         print(the_page)
 
     @staticmethod
     def get_pending(env):
         url = env.base_url + 'getpending?account=' + env.default_account
-        response = urllib.request.urlopen(url, timeout=30)
+        response = urllib.request.urlopen(url, timeout=60)
         the_page = response.read()
 
         data = json.loads(the_page)
