@@ -15,9 +15,8 @@ class TopTweets:
         self.db_summary = db_summary
         self.start_date = start_date
         self.end_date = end_date
-        self._todays_retweets = None
+        self._todays_retweets = self._get_todays_retweets()
 
-        self.get_todays_retweet_count('bob')
         for sn, tweets in self._todays_retweets.items():
             print(f'Tweets by {sn}:')
             for t in tweets:
@@ -25,10 +24,15 @@ class TopTweets:
 
         rows = db.get_top_tweets(start_date, end_date)
         print('{} rows returned.'.format(len(rows)))
+        foreign_rows = db.get_top_foreign_tweets(start_date, end_date)
+        print('{} foreign rows returned.'.format(len(foreign_rows)))
+        rows.extend(foreign_rows)
 
         tweet_counts = {}
         main_tweets = []
         celeb_tweets = []
+        foreign_main_tweets = []
+        foreign_celeb_tweets = []
         for tweet in rows:
             if (db_summary.not_selected_for_retweet(tweet.id)
                     and tweet.screen_name not in tweet_counts
@@ -38,9 +42,15 @@ class TopTweets:
                     main_tweets.append(tweet)
                 elif tweet.category == 'B' and len(celeb_tweets) < 3:
                     celeb_tweets.append(tweet)
+                elif tweet.category == 'FA' and len(foreign_main_tweets) < 1:
+                    foreign_main_tweets.append(tweet)
+                elif tweet.category == 'FB' and len(foreign_celeb_tweets) < 1:
+                    foreign_celeb_tweets.append(tweet)
 
         main_tweets = main_tweets[:3]
         main_tweets.extend(celeb_tweets[:2])
+        main_tweets.extend(foreign_main_tweets)
+        main_tweets.extend(foreign_celeb_tweets)
 
         self.tweets = main_tweets
         print('{} tweets selected.'.format(len(main_tweets)))

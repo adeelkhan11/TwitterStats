@@ -48,7 +48,7 @@ def main():
         if command.id in processed_commands:
             logger.info(f'Skipping {command.id}. Already processed: {command.text}')
         else:
-            m = re.match('\+([a-zA-Z0-9_]+) ([A-Z])( t ([0-9]+))?( dl ([0-9]+))?', command.text)
+            m = re.match('\+([a-zA-Z0-9_]+) ([A-Z][AB]?)( t ([0-9]+))?( dl ([0-9]+))?', command.text)
             if m:
                 screen_name = m.group(1)
                 category = m.group(2)

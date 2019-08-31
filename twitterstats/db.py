@@ -246,6 +246,41 @@ class DB(DBUtil):
         tweets = [PublishRetweet(*row) for row in rows]
         return tweets
 
+    def get_top_foreign_tweets(self, start_date, end_date):
+        t = (start_date, end_date, self.env.cutoff_a[0], 'FA', self.env.cutoff_b[0], 'FB',
+             '%pak''istan%', '%pak''stan%', '%kash''mir%', '%kSH''myr%')
+        sql = """select t.id, t.created_at, t.screen_name,
+        t.text, t.retweet_count, dt.category, t.retweet_count + (bot.bot_factor * 2) as score, bot.bot_data_availability
+        from (
+        select count(*) tweet_count, sum(IfNull(bot_score, 4) - 4) as bot_factor,
+        sum(case when bot_score is null then 0 else 1 end) bot_data_availability, max(t.retweet_count) retweet_count,
+        retweet_id, t.retweet_screen_name, t.text
+        from fact_status t join dim_tweeter dt on t.tweeter_skey = dt.tweeter_skey
+        where t.retweet_id != 0
+        group by t.retweet_id, t.retweet_screen_name, t.text
+        ) bot
+        join fact_status t on bot.retweet_id = t.id
+        join dim_tweeter dt on dt.screen_name = t.screen_name
+        where t.created_at >= ?
+        and t.created_at <= ?
+        and bot.tweet_count > 1
+        and t.retweet_id = 0
+        and t.retweeted is null
+        and ((t.retweet_count >= IFNULL(dt.rt_threshold, ?) and dt.category = ?) 
+             or (t.retweet_count >= IFNULL(dt.rt_threshold, ?) and dt.category = ?))
+        and (t.english_words like ?
+             or t.english_words like ?
+             or t.english_words like ?
+             or t.english_words like ?)
+        order by t.retweet_count + (bot.bot_factor * 2) desc LIMIT 1000
+        ;
+        """
+        self.c.execute(sql, t)
+        rows = self.c.fetchall()
+
+        tweets = [PublishRetweet(*row) for row in rows]
+        return tweets
+
     def get_next_batch_id(self):
         batch_id = 1
         self.c.execute('SELECT max(batch_id) max_id FROM fact_status')
@@ -845,7 +880,7 @@ class DB(DBUtil):
     def get_list_additions(self):
         sql = """select screen_name, category, list
         from dim_tweeter
-        where category in ('A', 'B', 'C', 'D')
+        where category in ('A', 'B', 'C', 'D', 'FA', 'FB')
         and (list is null or (list not like category || '%' and list not like 'ERROR%'))
         order by category, category_date
         LIMIT 100"""
@@ -855,7 +890,7 @@ class DB(DBUtil):
     def get_list_removals(self):
         sql = """select screen_name, category, list
         from dim_tweeter
-        where (category is null or category not in ('A', 'B', 'C', 'D'))
+        where (category is null or category not in ('A', 'B', 'C', 'D', 'FA', 'FB'))
         and list is not null
         and list not like 'ERROR%'
         order by category, category_date
