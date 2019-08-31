@@ -910,7 +910,7 @@ class DB(DBUtil):
 
     def set_env_list_count(self, list_name, count):
         try:
-            for l in self.env.lists[list_name[0]]:
+            for l in self.env.lists[list_name[:-1]]:
                 if l['name'] == list_name:
                     l['count'] = count
         except TypeError:
