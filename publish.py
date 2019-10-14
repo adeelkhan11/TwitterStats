@@ -299,7 +299,9 @@ class Publish:
                 newtext += ' ' + tweet.items[i].tweet_text
             # todo join same trends
             w, h = draw.textsize(newtext, font=fontb)
-            while w > widthlimit:
+            oldtext = None
+            while w > widthlimit and oldtext != newtext:
+                oldtext = newtext
                 newtext = newtext.rsplit(' ', 1)[0]
                 w, h = draw.textsize(newtext, font=fontb)
             self.print_text(newtext, (450 + textbuffer, 130 + (listed * 60)), template.SCREEN_NAME_COLOUR, draw, fontb)
