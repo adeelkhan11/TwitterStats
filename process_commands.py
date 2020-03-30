@@ -16,12 +16,12 @@ logger = logging.getLogger('process_commands')
 
 def save_command(command, status_text, db_summary, polling_api):
     logger.info(f'{command.id}: {status_text}')
-    try:
-        polling_api.PostUpdate(status_text,
-                               in_reply_to_status_id=command.id,
-                               auto_populate_reply_metadata=True)
-    except TwitterError as e:
-        logger.error(e.message)
+    # try:
+    #     polling_api.PostUpdate(status_text,
+    #                            in_reply_to_status_id=command.id,
+    #                            auto_populate_reply_metadata=True)
+    # except TwitterError as e:
+    #     logger.error(e.message)
     command.status = status_text
     command.processed_date = now()
     db_summary.save_command(command)
