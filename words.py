@@ -80,7 +80,8 @@ class Words:
             api = twitter.Api(consumer_key=self.CONSUMER_KEY,
                               consumer_secret=self.CONSUMER_SECRET,
                               access_token_key=token.key,
-                              access_token_secret=token.secret)
+                              access_token_secret=token.secret,
+                              sleep_on_rate_limit=True)
             self.twitters.append(api)
 
         self.today_skey = 0
