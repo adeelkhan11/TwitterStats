@@ -85,6 +85,13 @@ t8 = BashOperator(
         python_executable),
     dag=dag)
 
+dim_db = BashOperator(
+    task_id='new_dim_db',
+    bash_command='cd {};{} new_dim_db.py'.format(
+        python_script_path,
+        python_executable),
+    dag=dag)
+
 archive = BashOperator(
     task_id='archive_data',
     bash_command='rsync --progress --times --files-from=<(find {}/env/dev/data -mtime +185 -type f -exec basename {{}} \;) {}/env/dev/data adeel@192.168.1.4:/volume1/Dump/pakpolstats/data --remove-source-files'.format(
@@ -93,4 +100,4 @@ archive = BashOperator(
     dag=dag)
 
 
-t1 >> dt1 >> dt2 >> dt3 >> hu >> t2 >> t4 >> t5 >> t7 >> t8 >> archive
+t1 >> dt1 >> dt2 >> dt3 >> hu >> t2 >> t4 >> t5 >> t7 >> t8 >> dim_db >> archive
