@@ -18,7 +18,9 @@ class NewDimDB:
         self.environment = environment
         archive_file = environment.dimension_database_old.format(last_month().replace('-', '_'))
         if os.path.isfile(archive_file):
-            raise ArchiveFileExistsError()
+            logger.warning('Archive file already exists.')
+            exit(0)
+            # raise ArchiveFileExistsError()
 
         self.old_db = sqlite3.connect(environment.dimension_database)
         self.old_c = self.old_db.cursor()
