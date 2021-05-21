@@ -1,4 +1,4 @@
-import env.dev.env as environment
+import env.dev.env_prod_nopost as environment
 
 
 def get_environment():

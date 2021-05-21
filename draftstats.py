@@ -19,6 +19,7 @@ from twitterstats.db import DB
 from twitterstats.dbsummary import DBSummary
 from twitterstats.publisher import Publisher
 from twitterstats.secommon import now
+from twitterstats.staticpublisher import StaticPublisher
 from twitterstats.urdu import urdu_to_english
 import logging
 
@@ -45,6 +46,7 @@ class DraftStatsTweetSubItem:
     rt_count: int = None
     rt_received_count: int = None
     botness: int = None
+    page_url: str = None
 
     def publish_dict(self):
         result = {'score': self.score, 'tweet_text': self.tweet_text,
@@ -161,7 +163,7 @@ class Stats:
                         (i < 11 and subindex == 1) or (i <= 20 and a.lower()[1:] in self.tag_history and y >= 700)):
                     completeness = db.get_tag_completeness(a)
                     print("Completeness for %s: %0.3f" % (a, completeness))
-                    if completeness > 0.999:
+                    if completeness > 0.99:
                         actions.append({'type': 'trenders', 'trend': a[1:]})
             # if type != 'trenders':
             # print
@@ -461,6 +463,7 @@ def main():
     environment = defaults.get_environment()
     db = DB(environment, args.date)
     db_summary = DBSummary(environment)
+    static_publisher = StaticPublisher(datetime.datetime.strptime(args.date, '%Y-%m-%d'))
 
     date_skey = db.get_date_skey(args.date)
 
@@ -497,7 +500,8 @@ def main():
             tweets.append(tweet)
         if len(tweets) >= 2:
             data = {'tweets': tweets, 'date': args.date}
-            Publisher.publish(environment, data, 'draft')
+            # Publisher.publish(environment, data, 'draft')
+            static_publisher.publish(tweets)
             tweets = list()
             time.sleep(10)
         action_ind += 1
@@ -540,7 +544,9 @@ def main():
     metric_dict['account_followers'] = followers_count
 
     data = {'tweets': tweets, 'metrics': metric_dict, 'date': args.date}
-    Publisher.publish(environment, data, 'draft')
+    # Publisher.publish(environment, data, 'draft')
+    static_publisher.publish(tweets)
+    static_publisher.commit()
 
 
 # jdata = { 'tweets' : tweets, 'date': args.date }

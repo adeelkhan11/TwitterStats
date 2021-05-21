@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <link href="/grid.css" rel="stylesheet">
+
+  <title>{{ title }}</title>
+</head>
+<body>
+<div class="container">
+    <div class="row">
+        <div class="clear col-8">
+            <h1>{{title}}</h1>
+        </div>
+        <div class="clear col-4 right">
+            <h1><a href="/index.html"><i class="fa fa-home"></i></a></h1>
+        </div>
+    </div>
+    <div class="row sticky-top">
+        <div class="col-1 right">#</div>
+        <div class="col-8 col-sm-7" >Trend</div>
+        <div class="col-3 col-sm-2 col-lg-1 centre">Score</div>
+        <div class="col-sm-2 col-lg-1 centre d-none d-sm-inline">Stars</div>
+        <div class="col-lg-1 right d-none d-lg-inline">Tweet Count</div>
+        <div class="col-lg-1 right d-none d-lg-inline">Tweep Count</div>
+    </div>
+
+{% for si in items %}
+    <div class="row">
+        <div class="col-1 right">{{loop.index}}</div>
+        <div class="col-8 col-sm-7" >
+            {% if si.page_url is not none %}
+            <a href="{{si.page_url}}">{{si.tweet_text}}</a>
+{% else %}
+    {{si.tweet_text}}
+{%endif %}</div>
+        <div class="col-3 col-sm-2 col-lg-1 centre">{{si.score}}</div>
+        <div class="col-sm-2 col-lg-1 centre d-none d-sm-inline">{{si.star_count}}</div>
+        <div class="col-lg-1 right d-none d-lg-inline">{{si.tweet_count}}</div>
+        <div class="col-lg-1 right d-none d-lg-inline">{{si.tweep_count}}</div>
+    </div>
+{% endfor %}
+</div>
+</body>
+</html>
