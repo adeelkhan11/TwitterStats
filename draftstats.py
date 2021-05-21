@@ -23,7 +23,7 @@ from twitterstats.urdu import urdu_to_english
 import logging
 
 logger = logging.getLogger('draftstats')
-
+DAILY_STAT_TWEET_LIMIT = 7
 
 # logger = logging.getLogger('simpleExample')
 
@@ -472,7 +472,7 @@ def main():
 
     action_ind = 0
     tweets = list()
-
+    stat_tweet_count = 0
     while action_ind < len(actions):
         action = actions[action_ind]['type']
         # tweeters = None
@@ -481,9 +481,10 @@ def main():
 
         i = 100
         is_tweetable = True
+
         if action == "trenders":
             tweet = stats.write_tweet(i)
-            if not stats.is_trenders_tweet_postable(tweet):
+            if not stats.is_trenders_tweet_postable(tweet) or stat_tweet_count >= DAILY_STAT_TWEET_LIMIT:
                 is_tweetable = False
         elif action == "trends":
             tweet = stats.write_tweet(i)
@@ -492,6 +493,7 @@ def main():
 
         if is_tweetable:
             db_summary.save_tweet(tweet)
+            stat_tweet_count += 1
 
         if tweet is not None:
             tweets.append(tweet)
