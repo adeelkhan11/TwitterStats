@@ -133,7 +133,7 @@ class DBSummary(DBUtil):
         self.c.execute(
             'SELECT t_id, type, head, tail, image_head, date_nkey, period, status, tweet_id, account'
             ', background_image, retweet_id'
-            ' from tweet where status IN (?, ?) and type in (?, ?, ?) order by drafted_at LIMIT 10',
+            ' from tweet where status IN (?, ?) and type in (?, ?, ?) order by drafted_at LIMIT 4',
             t)
         rows = self.c.fetchall()
         logger.info('%d stats', len(rows))
