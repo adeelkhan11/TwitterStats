@@ -5,6 +5,7 @@ https://github.com/apache/incubator-airflow/blob/master/airflow/example_dags/tut
 from airflow import DAG
 from airflow.operators.bash_operator import BashOperator
 from datetime import datetime, timedelta
+
 # from airflow.utils.trigger_rule import TriggerRule
 
 
@@ -28,7 +29,8 @@ default_args = {
 dag = DAG(
     'ats_daily', default_args=default_args,
     schedule_interval='0 0 * * *',
-    catchup=False)
+    catchup=False,
+    max_active_runs=1)
 
 python_executable = '~/venv/bin/python3.7'
 python_script_path = '~/PycharmProjects/TwitterStats'
@@ -98,6 +100,5 @@ archive = BashOperator(
         python_script_path,
         python_script_path),
     dag=dag)
-
 
 t1 >> dt1 >> dt2 >> dt3 >> hu >> t2 >> t4 >> t5 >> t7 >> t8 >> dim_db >> archive
