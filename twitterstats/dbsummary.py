@@ -188,8 +188,12 @@ class DBSummary(DBUtil):
 
     def save_retweet(self, tweet_id):
         t = (tweet_id, self.env.default_account, now())
-        self.c.execute('insert into retweets (tweet_id, account, retweeted_at) values (?, ?, ?)', t)
-        self.commit()
+        try:
+            self.c.execute('insert into retweets (tweet_id, account, retweeted_at) values (?, ?, ?)', t)
+            self.commit()
+        except sqlite3.IntegrityError:
+            logger.warning(f'Integrity error. Duplicate in retweets (tweet_id={tweet_id}, '
+                           f'account={self.env.default_account}')
 
     def save_tweet_retweet_id(self, tweet_id, retweet_id):
         t = (retweet_id, f'{tweet_id}-{self.env.default_account}')
