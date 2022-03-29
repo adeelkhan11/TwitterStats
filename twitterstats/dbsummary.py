@@ -124,7 +124,7 @@ class DBSummary(DBUtil):
         self.c.execute(
             'SELECT t_id, type, head, tail, image_head, date_nkey, period, status, tweet_id, account'
             ', background_image, retweet_id'
-            ' from tweet where status IN (?, ?, ?) and type in (?) order by tweet_id LIMIT 3',
+            ' from tweet where status IN (?, ?, ?) and type in (?) order by tweet_id LIMIT 5',
             t)
         rows = self.c.fetchall()
         logger.info('%d retweets', len(rows))
