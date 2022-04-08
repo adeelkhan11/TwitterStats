@@ -124,11 +124,17 @@ class DBSummary(DBUtil):
         self.c.execute(
             'SELECT t_id, type, head, tail, image_head, date_nkey, period, status, tweet_id, account'
             ', background_image, retweet_id'
-            ' from tweet where status IN (?, ?, ?) and type in (?) order by tweet_id LIMIT 5',
+            ' from tweet where status IN (?, ?, ?) and type in (?) order by tweet_id',
             t)
         rows = self.c.fetchall()
-        logger.info('%d retweets', len(rows))
-        results.extend(rows)
+        if len(rows) < 10:
+            retweet_count = 5
+        elif len(rows) < 20:
+            retweet_count = 7
+        else:
+            retweet_count = 10
+        logger.info('%d retweets', retweet_count)
+        results.extend(rows[:retweet_count])
         t = ('pend-post', 'pend-rej', 'trends', 'mentions', 'trenders')
         self.c.execute(
             'SELECT t_id, type, head, tail, image_head, date_nkey, period, status, tweet_id, account'
