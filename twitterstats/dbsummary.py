@@ -128,12 +128,12 @@ class DBSummary(DBUtil):
             t)
         rows = self.c.fetchall()
         if len(rows) < 10:
-            retweet_count = 5
+            retweet_count = min(5, len(rows))
         elif len(rows) < 20:
             retweet_count = 7
         else:
             retweet_count = 10
-        logger.info('%d retweets', retweet_count)
+        logger.info(f'{retweet_count}/{len(rows)} retweets')
         results.extend(rows[:retweet_count])
         t = ('pend-post', 'pend-rej', 'trends', 'mentions', 'trenders')
         self.c.execute(
